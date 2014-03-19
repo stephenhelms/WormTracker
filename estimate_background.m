@@ -2,6 +2,13 @@ function background = estimate_background(video,N_sample)
 % estimate_background estimates the unchanging background in a video by
 % averaging all the frames, evenly sampled N_sample times
 
+% The gaussian filter is used to smooth out rough edges in the bacterial
+% lawn made by the moving worm. These parameters are optimized for Leon's
+% lab's videos and may need to be updated for other cases.
+gauss = [7,7];
+sigma = 10;
+GaussFilter = fspecial('gaussian', gauss, sigma);
+
 background = zeros(video.Height,video.Width,'uint8');
 N_frames = video.NumberOfFrames;
 ii = 0;
@@ -9,7 +16,7 @@ t = zeros(1,N_sample);
 for i=1:round(N_frames/N_sample):N_frames
     tic;
     frame = rgb2gray(read(video,i));
-    background = imadd(background,imdivide(frame,(N_sample+1)));
+    background = imadd(background,imdivide(imfilter(frame,GaussFilter),(N_sample+1)));
     ii = ii + 1;
     t(ii) = toc;
     disp([num2str(ii/(N_sample+1)*100),'% complete']);

@@ -24,6 +24,15 @@ else
     background = imbothat(output.im_gray,strel('disk',100));
     output.im_bgrem = 255 - (background - output.im_gray);
 end
+
+%Use a low pass gaussian filter to get a better outline of the worm.
+%Otherwise the transparency of the worm impairs analysis
+% Parameters are optimized for Leon's lab's videos
+gauss = [7,7];
+sigma = 10;
+GaussFilter = fspecial('gaussian', gauss, sigma);
+output.im_bgrem = imfilter(output.im_bgrem, GaussFilter);
+
 % Threshold image
 output.bw_thresh = im2bw(output.im_bgrem,thresh);
 % Fix morphological defects in the thresholding by closing
