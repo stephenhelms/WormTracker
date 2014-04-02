@@ -1,10 +1,8 @@
 function frame_info = analyze_video(video,video_out,frameRate,pixels_per_um,crop,thresh,bg,clse,W_worm,L_worm,show_analysis)
 % crop should be a N worm box x rectangle dimensions
 N_worms = size(crop,1);
-N_frames = 30*60*11.5; % Only use 30 minutes
-if N_frames > video.NumberOfFrames
-    N_frames = video.NumberOfFrames;
-end
+N_frames = video.NumberOfFrames;
+
 t_frame_est = ones(1,N_frames)*NaN;
 
 % These limits will be used for accepting or rejecting thresholded objects
@@ -18,7 +16,6 @@ if show_analysis
     open(video_out); % Open the output video
 end
 
-prevHeadTail = repmat([0 0; Inf Inf],[1 1 N_worms]); % Initialize the head/tail location
 % Determine how many body points to measure
 if L_worm*pixels_per_um > 100
     numBodyPoints = 50;%100;
@@ -155,11 +152,6 @@ for i=1:n_batch:N_frames
                     if ~frame_info(i+j-1,k).bad_skeletonization
                         % Measure the body midpoint
                         frame_info(i+j-1,k) = measure_body_midpoint(frame_info(i+j-1,k),pixels_per_um);
-                        % Use the midpoint to track the relative position of the head
-                        % and tail, flipping the ordering if necessary to better match
-                        % the previous frame
-                        frame_info(i+j-1,k) = conform_headtail_ordering(frame_info(i+j-1,k),...
-                            squeeze(prevHeadTail(:,:,k)));
 
                         % Find the tangent angles along the ordered skeleton
                         [frame_info(i+j-1,k).theta,~,L]=...
@@ -169,18 +161,9 @@ for i=1:n_batch:N_frames
 
                         % Check for bad skeletonization due to implausible
                         % lengths
-                        if frame_info(i+j-1,k).length < 0.5*L_worm | frame_info(i+j-1,k).length > 2*L_worm
+                        if frame_info(i+j-1,k).length < 0.5*L_worm || frame_info(i+j-1,k).length > 2*L_worm
                             frame_info(i+j-1,k).bad_skeletonization = true;
                         end
-
-                        % Save the head/tail position
-                        prevHeadTail(:,:,k) = repmat(frame_info(i+j-1,k).stats.BoundingBox(1:2),2,1) + ...
-                            frame_info(i+j-1,k).skeleton_endpoints - repmat([frame_info(i+j-1,k).x_mid, ...
-                            frame_info(i+j-1,k).y_mid],2,1);
-                    else
-                        % Reset the head/tail position if the frame couldn't be
-                        % analyzed
-                        prevHeadTail(:,:,k) = [0 0; Inf Inf];
                     end
                 else
                     frame_info(i+j-1,k).length = NaN;
@@ -189,7 +172,6 @@ for i=1:n_batch:N_frames
                     frame_info(i+j-1,k).bw_worm = [];
                     frame_info(i+j-1,k).skeleton = [];
                     frame_info(i+j-1,k).bad_skeletonization = true;
-                    prevHeadTail(:,:,k) = [0 0; Inf Inf];
                 end
             end
         end
