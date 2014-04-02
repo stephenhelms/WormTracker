@@ -1,12 +1,12 @@
 %% Load video
-videoFile = ‘your_video.avi’;
+videoFile = 'U:\Helms\2014-03-11_lena_test_chambers_xvid.avi';
 video = VideoReader(videoFile);
 frameRate = 11.5; % should be changed to match the frame rate of your camera
 figure; % This takes a while sometimes, so this just lets you know it is done
 %% Read first frame
 first_frame = rgb2gray(read(video,1));
 %% Measure known distance
-known_distance = 10000; % in um, enter a value you can estimate from the video.
+known_distance = 25500; % in um, the width of the slide
 % alternatively, use the length of a worm (~1000 um) and click on the ends of a worm
 
 f = figure;
@@ -18,16 +18,10 @@ pixels_per_um = sqrt((y(2)-y(1))^2 + (x(2)-x(1))^2)/known_distance
 
 %% Pick crop boundaries
 f = figure;
-subplot(2,4,1:4); %If you have something other than 4 regions, change this
-imshow(first_frame,'InitialMagnification','fit');
-title(['Drag to select the cropped area']);
+n_regions = 4;%If you have something other than 4 regions, change this
 crop = [0 0 0 0];
-for i=1:4 % Also change this
-    figure;
+for i=1:n_regions % Also change this
     [first_frame_crop,crop(i,:)] = imcrop(first_frame);
-    figure(f);
-    subplot(2,4,4+i);
-    imshow(first_frame_crop,'InitialMagnification','fit');
 end
 
 %% Estimate background
@@ -79,7 +73,7 @@ video_out = VideoWriter(analysisVideoName);
 video_out.FrameRate = frameRate*2; % 2X speed
 
 %% Analyze video
-outputName = ’test_analysis.mat’;
+outputName = 'test_analysis.mat';
 save(outputName);
 frame_info = analyze_video2_multiworm(video,video_out,frameRate,pixels_per_um,crop,thresh,bg_crop,clse,W_worm,L_worm,1); % For faster analysis, set the last parameter to 0 — this turns off plotting
 close(video_out);
