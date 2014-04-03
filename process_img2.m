@@ -1,4 +1,4 @@
-function output = process_img2(img,thresh,bg,clse,compactness_thresh,hole_area_thresh)
+function output = process_img2(img,thresh,bg_disk_radius,clse,compactness_thresh,hole_area_thresh)
 % PROCESS_IMG Process color image of worms by removing the background,
 % thresholding, cleaning up the worm shapes.
 % img: The raw video frame
@@ -18,23 +18,12 @@ else
     output.im_gray = img;
 end
 % Remove background - this assumes the image has a light background
-if ~isempty(bg)
-    output.im_bgrem = imcomplement(imsubtract(bg,output.im_gray));
-else
-    background = imbothat(output.im_gray,strel('disk',100));
-    output.im_bgrem = 255 - (background - output.im_gray);
-end
-
-%Use a low pass gaussian filter to get a better outline of the worm.
-%Otherwise the transparency of the worm impairs analysis
-% Parameters are optimized for Leon's lab's videos
-gauss = [7,7];
-sigma = 10;
-GaussFilter = fspecial('gaussian', gauss, sigma);
-output.im_bgrem = imfilter(output.im_bgrem, GaussFilter);
+output.im_bgrem = imcomplement(imbothat(output.im_gray,strel('disk',bg_disk_radius)));
 
 % Threshold image
 output.bw_thresh = im2bw(output.im_bgrem,thresh);
+% Remove objects connected to edge
+output.bw_thresh = imcomplement(imclearborder(imcomplement(output.bw_thresh)));
 % Fix morphological defects in the thresholding by closing
 bw_cleaned_close = imclose(~output.bw_thresh,clse);
 % Fix morphological defects by filling holes
