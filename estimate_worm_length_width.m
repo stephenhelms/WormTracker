@@ -1,7 +1,7 @@
-function [L_worm,W_worm] = estimate_worm_length_width(frame,bg,thresh,pixels_per_um)
+function [L_worm,W_worm] = estimate_worm_length_width(frame,bg_disk_radius,thresh,pixels_per_um)
 
 processed_frame = process_img2(frame,thresh,...
-                bg,strel('disk',2),10,10);
+                bg_disk_radius,strel('disk',2),10,10);
 
 min_expected_worm_area = 30*300*pixels_per_um^2*0.7;
 max_expected_worm_area = 150*2000*pixels_per_um^2*1.3;
