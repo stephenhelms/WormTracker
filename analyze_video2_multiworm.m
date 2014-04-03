@@ -1,4 +1,5 @@
-function frame_info = analyze_video(video,video_out,frameRate,pixels_per_um,crop,thresh,bg,clse,W_worm,L_worm,show_analysis)
+function frame_info = analyze_video(video,video_out,frameRate,pixels_per_um,...
+    crop,thresh,bg_disk_radius,W_worm,L_worm,show_analysis)
 % crop should be a N worm box x rectangle dimensions
 N_worms = size(crop,1);
 N_frames = video.NumberOfFrames;
@@ -7,8 +8,8 @@ t_frame_est = ones(1,N_frames)*NaN;
 
 % These limits will be used for accepting or rejecting thresholded objects
 % as worms
-min_expected_worm_area = (0.7*W_worm)*(0.6*L_worm)*pixels_per_um^2*0.6;
-max_expected_worm_area = (1.3*W_worm)*(1.4*L_worm)*pixels_per_um^2*1.4;
+min_expected_worm_area = (0.7*W_worm)*(0.6*L_worm)*pixels_per_um^2;
+max_expected_worm_area = (1.3*W_worm)*(1.4*L_worm)*pixels_per_um^2;
 
 % Open the analysis progress figure
 if show_analysis
@@ -28,6 +29,9 @@ elseif L_worm*pixels_per_um > 15
 else
     error('Insufficient resolution for postural analysis.');
 end
+
+% The worm shape will be filtered using worm-sized disk
+clse = strel('disk',round(W_worm*pixels_per_um/2));
 
 disp('Analyzing video frames...');
 n_batch = 8*10; % This is the number of frames loaded at once. I have an 8-core processor, and 80 frames is ~350 MB so this works well
@@ -70,7 +74,7 @@ for i=1:n_batch:N_frames
         for k=1:N_worms
             % Process frame to identify connected components
             processed_frame = process_img2(imcrop(frames(:,:,j),crop(k,:)),thresh,...
-                bg{k},clse,10,10);
+                bg_disk_radius,clse,10,10);
 
             analysis(j,k).im_gray = processed_frame.im_gray;
             analysis(j,k).bw_cleaned = processed_frame.bw_cleaned;
