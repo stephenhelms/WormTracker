@@ -24,33 +24,38 @@ for i=1:n_regions % Also change this
     [first_frame_crop,crop(i,:)] = imcrop(first_frame);
 end
 
-%% Estimate background
-N_sample = 50;
-background = estimate_background(video,N_sample);
-figure;
-for i=1:size(crop,1)
-    bg_crop{i} = imcrop(background,crop(i,:));
+%% Draw food circles
+f = figure;
+food_region = zeros(n_regions,3);
+for i=1:n_regions
+    imshow(imcrop(first_frame,crop(i,:)));
+    h = imellipse(gca,[0 0 100 100]);
+    setFixedAspectRatioMode(h,true);
+    wait(h);
+    pos = getPosition(h);
+    food_region(i,:) = [pos(1)+pos(3)/2,pos(2)+pos(4)/2,pos(3)/2];
+    hold on;
+    plot(food_region(i,1),food_region(i,2),'ro');
+    plot(food_region(i,1)+[0 food_region(i,3)],food_region(i,2)*[1 1],'r-');
 end
-figure;
-first_frame_corrected = imcomplement(imsubtract(background,first_frame));
-subplot(1,3,1);
-imshow(first_frame);
-title('First Frame');
-subplot(1,3,2);
-imshow(background);
-title('Background');
-subplot(1,3,3);
-imshow(first_frame_corrected);
-title('First Frame, Corr.');
+
+%% Configure background removal filter
+disk_radius = 5;
+first_frame_corrected = imcomplement( ...
+    imbothat(first_frame,strel('disk',disk_radius)));
+figure; imshow(imadjust(first_frame_corrected));
 
 %% Determine appropriate threshold
-thresh = 0.90;
+thresh = 0.88;
 figure;
 h = [];
-h(1) = subplot(1,2,1);
+h(1) = subplot(1,3,1);
+imshow(first_frame);
+title('First Frame');
+h(2) = subplot(1,3,2);
 imshow(first_frame_corrected);
 title('First Frame, Corrected');
-h(2) = subplot(1,2,2);
+h(3) = subplot(1,3,3);
 imshow(im2bw(first_frame_corrected,thresh));
 title('Thresholded');
 linkaxes(h);
@@ -59,13 +64,12 @@ linkaxes(h);
 
 %% Worm parameters - used for morphology operations and quality control
 % Try to find a worm automatically and measure the length and width
-[L_worm,W_worm] = estimate_worm_length_width(imcrop(first_frame,crop(1,:)),bg_crop{1},thresh,pixels_per_um)
+i = 3;
+[L_worm,W_worm] = estimate_worm_length_width(imcrop(first_frame,crop(i,:)),...
+    disk_radius,thresh,pixels_per_um)
 % If this fails, manually enter estimates of worm length and width
 %L_worm = 1000;
 %W_worm = 35;
-
-% The worm shape will be filtered using worm-sized disk
-clse = strel('disk',round(W_worm*pixels_per_um/2));
 
 %% Save analysis video to:
 analysisVideoName = 'test.avi';
@@ -75,7 +79,9 @@ video_out.FrameRate = frameRate*2; % 2X speed
 %% Analyze video
 outputName = 'test_analysis.mat';
 save(outputName);
-frame_info = analyze_video2_multiworm(video,video_out,frameRate,pixels_per_um,crop,thresh,bg_crop,clse,W_worm,L_worm,1); % For faster analysis, set the last parameter to 0 — this turns off plotting
+% For faster analysis, set the last parameter to 0 — this turns off plotting
+frame_info = analyze_video2_multiworm(video,video_out,frameRate,pixels_per_um,...
+    crop,thresh,disk_radius,W_worm,L_worm,1);
 close(video_out);
 save(outputName);
 post_process_mw_video
