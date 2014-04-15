@@ -81,7 +81,7 @@ outputName = 'test_analysis.mat';
 save(outputName);
 % For faster analysis, set the last parameter to 0 — this turns off plotting
 frame_info = analyze_video2_multiworm(video,video_out,frameRate,pixels_per_um,...
-    crop,thresh,disk_radius,W_worm,L_worm,1);
+    crop,thresh,disk_radius,W_worm,L_worm,0);
 close(video_out);
 save(outputName);
 post_process_mw_video
