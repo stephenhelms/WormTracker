@@ -171,12 +171,18 @@ class WormImageProcessor:
                                  dtype=np.uint8)
                 g.create_dataset('wormDiskRadius', 1, dtype=np.uint8)
                 g.create_dataset('pixelsPerMicron', 1, dtype=float)
+                g.create_dataset('holeAreaThreshold', 1, dtype=int)
+                g.create_dataset('compactnessThreshold', 1, dtype=float)
+                g.create_dataset('wormAreaThresholdRange', 2, dtype=float)
             # write configuration
             g = f[path]
             g['threshold'] = self.threshold
             g['backgroundDiskRadius'] = self.backgroundDiskRadius
             g['wormDiskRadius'] = self.wormDiskRadius
             g['pixelsPerMicron'] = self.pixelsPerMicron
+            g['holeAreaThreshold'] = self.holeAreaThreshold
+            g['compactnessThreshold'] = self.compactnessThreshold
+            g['wormAreaThresholdRange'] = self.wormAreaThresholdRange
 
 
 def bwdiagfill(bwimage):
@@ -199,4 +205,39 @@ def bwdiagfill(bwimage):
     for hood in hoods:
         output = np.logical_or(output,
                                ndimage.binary_hit_or_miss(bwimage, hood))
+    return output
+
+
+def find1Cpixels(bwImage):
+    """ identifies 1-connected pixels in image """
+    # fills pixels matching the following neighborhoods:
+    hoods = [[[1, 0, 0],
+              [0, 1, 0],
+              [0, 0, 0]],
+             [[0, 1, 0],
+              [0, 1, 0],
+              [0, 0, 0]],
+             [[0, 0, 1],
+              [0, 1, 0],
+              [0, 0, 0]],
+             [[0, 0, 0],
+              [1, 1, 0],
+              [0, 0, 0]],
+             [[0, 0, 0],
+              [0, 1, 1],
+              [0, 0, 0]],
+             [[0, 0, 0],
+              [0, 1, 0],
+              [1, 0, 0]],
+             [[0, 0, 0],
+              [0, 1, 0],
+              [0, 1, 0]],
+             [[0, 0, 0],
+              [0, 1, 0],
+              [0, 0, 1]]]
+    output = np.zeros(bwImage.shape, dtype=np.bool)
+    # for each neighborhood, find matching pixels and set them to 1 in the img
+    for hood in hoods:
+        output = np.logical_or(output,
+                               ndimage.binary_hit_or_miss(bwImage, hood))
     return output

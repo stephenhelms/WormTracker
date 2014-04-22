@@ -1,7 +1,8 @@
 import numpy as np
+from scipy import interpolate
 from matplotlib import pyplot as plt
 import cv2
-from skimage import morphology
+from skimage import morphology, graph
 import h5py
 from subprocess import check_output
 import sys
@@ -205,17 +206,17 @@ class WormVideoRegion:
 
 
 class WormImage:
-    boundingBox = []
-    bwWormImage = []
-    grayWormImage = []
-    outlinedWormImage = []
-    skeletonizedWormImage = []
-    skeleton = []
-    centroid = []
-    midpoint = []
-    width = []
-    length = []
-    posture = []
+    boundingBox = None
+    bwWormImage = None
+    grayWormImage = None
+    outlinedWormImage = None
+    skeletonizedWormImage = None
+    skeleton = None
+    centroid = None
+    midpoint = None
+    width = None
+    length = None
+    posture = None
 
     def __init__(self, videoRegion, grayFrame, bwFrame, wormContour):
         self.videoRegion = videoRegion
@@ -230,28 +231,48 @@ class WormImage:
 
         # crop frame
         self.bwWormImage = self.bwFrame[
-            self.boundingBox[0]:self.boundingBox[0]+self.boundingBox[2],
-            self.boundingBox[1]:self.boundingBox[1]+self.boundingBox[3]]
+            self.boundingBox[1]:self.boundingBox[1]+self.boundingBox[3],
+            self.boundingBox[0]:self.boundingBox[0]+self.boundingBox[2]]
         self.grayWormImage = self.grayFrame[
-            self.boundingBox[0]:self.boundingBox[0]+self.boundingBox[2],
-            self.boundingBox[1]:self.boundingBox[1]+self.boundingBox[3]]
+            self.boundingBox[1]:self.boundingBox[1]+self.boundingBox[3],
+            self.boundingBox[0]:self.boundingBox[0]+self.boundingBox[2]]
 
     def outlineWorm(self):
-        raise NotImplemented()
+        self.outlinedWormImage = np.zeros(self.bwWormImage.shape,
+                                          dtype=np.uint8)
+        cv2.drawContours(self.outlinedWormImage, self.wormContour, 0, 255,
+                         thickness=1)
+        self.outlinedWormImage = np.equal(self.outlinedWormImage, 255)
 
     def skeletonizeWorm(self):
-        im = morphology.skeletonize(bwWormImage > 0)
+        self.skeletonizedWormImage = morphology.skeletonize(self.bwWormImage)
+        skeletonEnds = wormimageprocessor.find1Cpixels(
+            self.skeletonizedWormImage)
+        skeletonEndPts = cv2.findNonZero(np.uint8(skeletonEnds))
+        nEndPts = len(skeletonEndPts)
+        if nEndPts < 2:  # skeleton is a cirle (Omega turn)
+            self.badSkeletonization = True
+            self.crossedWorm = True
+        elif nEndPts > 2:  # skeleton has spurs
+            self.badSkeletonization = True
+        else:
+            skeletonInverted = np.logical_not(self.skeletonizedWormImage)
+            skeletonPts, cost = \
+                graph.route_through_array(np.uint8(skeletonInverted),
+                                          np.flipud(skeletonEndPts[0][0]),
+                                          np.flipud(skeletonEndPts[1][0]),
+                                          geometric=True)
+            self.skeleton = skeletonPts
+            self.badSkeletonization = False
 
     def measureWorm(self):
         # make sure the frame has been cropped
-        if bwWormImage == [] or grayWormImage == []:
-            cropToWorm()  # crop the frame to the worm
+        if self.bwWormImage is None or self.grayWormImage is None:
+            self.cropToWorm()  # crop the frame to the worm
 
-        calculateCentroid()  # measure centroid
-        calculateWidth()  # measure width
-        calculateLength()  # measure length
-        calculatePosture()  # measure body angles
-        # (store everything in HDF5)
+        self.calculateCentroid()  # measure centroid
+        self.calculatePosture()  # measure length, midpoint, and body angles
+        self.calculateWidth()  # measure width
 
     def calculateCentroid(self):
         moments = cv2.moments(self.wormContour)
@@ -263,13 +284,62 @@ class WormImage:
             self.centroid = []
 
     def calculateWidth(self):
-        raise NotImplemented()
-
-    def calculateLength(self):
-        raise NotImplemented()
+        # approximate width as 2*shortest path to contour at midpoint
+        mp = self.midpoint
+        self.outlineWorm()
+        cpts = np.float64(cv2.findNonZero(np.uint8(self.outlinedWormImage)))
+        self.width = 2*min([np.sqrt((mp[0]-pt[0])**2 + (mp[1]-pt[1])**2)
+                            for pt in cpts]) / self.videoRegion.pixelSize
 
     def calculatePosture(self):
-        raise NotImplemented()
+        self.skeletonizeWorm()  # find skeleton and length
+        pts = np.float64(self.skeleton)
+        # distance along skeleton
+        s = np.zeros((pts.shape[0], 1))
+        for i in xrange(1, len(s)):
+            s[i] = (np.sqrt((pts[i, 0]-pts[i-1, 0])**2 +
+                            (pts[i, 1]-pts[i-1, 1])**2) +
+                    s[i-1])
+        # calculate length
+        self.length = s[-1]/self.videoRegion.pixelSize
+        # fit spline to skeleton
+        fx = interpolate.InterpolatedUnivariateSpline(s/s[-1], pts[:, 0])
+        fy = interpolate.InterpolatedUnivariateSpline(s/s[-1], pts[:, 1])
+        # find midpoint
+        self.midpoint = (fx(0.5), fy(0.5))
+        # calculate body angles
+        nAngles = self.videoRegion.imageProcessor.numberOfPosturePoints
+        theta = np.zeros((nAngles, 1))
+        sp = np.linspace(0, 1, nAngles+2)
+        spi = np.array([fx(sp), fy(sp)]).transpose()
+        for i in xrange(1, nAngles+1):
+            theta[i-1] = np.arctan2((spi[i+1, 1]-spi[i-1, 1])/2.0,
+                                    (spi[i+1, 0]-spi[i-1, 0])/2.0)
+        theta = np.unwrap(theta)
+        self.meanBodyAngle = np.mean(theta)
+        self.posture = theta - self.meanBodyAngle
+
+    def toRegionCoordinates(self, pts):
+        if self.boundingBox is None:
+            self.cropToWorm()  # crop the frame to the worm
+        return [(pt[0] + self.boundingBox[0],
+                 pt[1] + self.boundingBox[1])
+                for pt in pts]
 
     def store(self, storeFile, index):
         raise NotImplemented()
+
+    def plot(self):
+        if self.bwWormImage is None:
+            self.cropToWorm()
+        if self.centroid is None:
+            self.measureWorm()
+        im = cv2.cvtColor(self.grayWormImage, cv2.COLOR_GRAY2RGB)
+        cv2.drawContours(im, self.wormContour, 0, (255, 0, 0))
+        plt.imshow(im)
+        plt.hold()
+        plt.plot(self.skeletonPts[:, 0], self.skeletonPts[:, 1], 'r-')
+        plt.scatter(self.skeletonPts[:, 0], self.skeletonPts[:, 1],
+                    c=self.posture, cmap=plt.get_cmap('PuOr'))
+        plt.plot(self.centroid[0], self.centroid[1], 'ro')
+        plt.plot(self.midpoint[0], self.midpoint[1], 'rs')

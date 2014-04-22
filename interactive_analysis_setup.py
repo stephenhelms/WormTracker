@@ -94,7 +94,7 @@ class WormVideo:
         name: The worm identifier
         """
         wr = wt.WormVideoRegion(self.videoFile, self.imageProcessor,
-                                self.storeFile, 
+                                self.storeFile,
                                 regionBounds, self.pixelsPerMicron,
                                 outputPrefix='temp',
                                 resultsStorePath=self.resultsStorePath,
@@ -185,6 +185,12 @@ def main(argv):
     #parser.add_argument('-o', '--output', help="the output image file")
     args = parser.parse_args()
     wv = WormVideo(args.input)
+    wv.determinePixelSize()
+    wv.defineRegions()
+    wv.defineFoodRegions()
+    wv.testBackgroundFilter()
+    wv.testThreshold()
+    wv.testWormIdentification()
 
 
 if __name__ == "__main__":
