@@ -198,12 +198,13 @@ class WormVideo:
             pre = self.videoInfoStorePath
             # check whether datasets exist
             if pre not in f:
-                g = f.create_group(pre)
+                f.create_group(pre)
+            g = f[pre]
+            if 'videoFile' not in g:
                 dt = h5py.special_dtype(vlen=str)
                 g.create_dataset('videoFile', (1,), dtype=dt)
 
             # write configuration
-            g = f[pre]
             # strip directory info from file
             path, fileName = os.path.split(self.videoFile)
             g['videoFile'][...] = fileName
@@ -447,13 +448,13 @@ class WormVideoRegion:
                    str(self.wormName))
             # check whether datasets exist
             if pre not in f:
-                g = f.create_group(pre)
+                f.create_group(pre)
+            g = f[pre]
+            if 'cropRegion' not in g:
                 g.create_dataset('cropRegion', (4,), dtype='int32')
                 g.create_dataset('foodCircle', (3,), dtype='float64')
 
             # write configuration
-            g = f[pre]
-            # strip directory info from file
             g['cropRegion'][...] = self.cropRegion
             g['foodCircle'][...] = self.foodCircle
 

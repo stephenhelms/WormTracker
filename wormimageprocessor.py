@@ -164,18 +164,20 @@ class WormImageProcessor:
     def saveConfiguration(self, storeFile, path):
         with h5py.File(storeFile) as f:
             # check whether datasets exist
-            g = f.require_group(path)
-            g.require_dataset('threshold', (1,), dtype='float64')
-            g.require_dataset('backgroundDiskRadius', (1,),
-                              dtype='uint8')
-            g.require_dataset('wormDiskRadius', (1,), dtype='uint8')
-            g.require_dataset('pixelsPerMicron', (1,), dtype='float64')
-            g.require_dataset('holeAreaThreshold', (1,), dtype='uint8')
-            g.require_dataset('compactnessThreshold', (1,), dtype='float64')
-            g.require_dataset('wormAreaThresholdRange', (2,),
-                              dtype='float64')
-            # write configuration
+            if path not in f:
+                f.create_group(path)
             g = f[path]
+            if 'threshold' not in g:
+                g.require_dataset('threshold', (1,), dtype='float64')
+                g.require_dataset('backgroundDiskRadius', (1,),
+                                  dtype='uint8')
+                g.require_dataset('wormDiskRadius', (1,), dtype='uint8')
+                g.require_dataset('pixelsPerMicron', (1,), dtype='float64')
+                g.require_dataset('holeAreaThreshold', (1,), dtype='uint8')
+                g.require_dataset('compactnessThreshold', (1,), dtype='float64')
+                g.require_dataset('wormAreaThresholdRange', (2,),
+                                  dtype='float64')
+            # write configuration
             g['threshold'][...] = self.threshold
             g['backgroundDiskRadius'][...] = self.backgroundDiskRadius
             g['wormDiskRadius'][...] = self.wormDiskRadius
