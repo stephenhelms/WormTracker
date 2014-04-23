@@ -315,10 +315,10 @@ class WormVideoRegion:
         # TODO: Delete temporary cropped video
 
     def _cropRegionForAvconv(self):
-        return 'x=' + str(self.cropRegion[0]) + ':' + \
-            'y=' + str(self.cropRegion[1]) + ':' + \
-            'out_w=' + str(self.cropRegion[2]) + ':' + \
-            'out_h=' + str(self.cropRegion[3])
+        return (str(self.cropRegion[2]) + ':' +
+                str(self.cropRegion[3]) + ':' +
+                str(self.cropRegion[0]) + ':' +
+                str(self.cropRegion[1]) + ':')
 
     def generateThresholdedVideo(self):
         """ Thresholds all the filtered frames and applies
