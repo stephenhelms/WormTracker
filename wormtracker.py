@@ -183,9 +183,11 @@ class WormVideo:
             cleaned = ip.applyMorphologicalCleaning(thresholded)
             possibleWorms = ip.identifyPossibleWorms(cleaned)
             likelyWorm = max(possibleWorms, key=lambda worm: worm[1])
-            wormImage = WormImage(region, filtered, thresholded, likelyWorm[0])
-            wormImage.measureWorm()
-            wormImage.plot()
+            if likelyWorm is not None:
+                wormImage = WormImage(region, filtered, thresholded,
+                                      likelyWorm[0])
+                wormImage.measureWorm()
+                wormImage.plot()
             plt.title(region.strainName + ' ' + region.wormName)
         plt.show()
 
