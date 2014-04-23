@@ -1,4 +1,3 @@
-import sys
 import cv2
 from skimage import segmentation
 import numpy as np
@@ -43,13 +42,13 @@ class WormImageProcessor:
     """
     Performs image processing tasks needed to find a worm in an image.
     """
-
+    frameRate = 11.5
     expectedWormLength = 1000
     expectedWormWidth = 50
     numberOfPosturePoints = -1
     holeAreaThreshold = 10
     compactnessThreshold = 10
-    wormIdentificationThresholdRange = [0.5, 1.5]
+    wormAreaThresholdRange = [0.5, 1.5]
 
     def __init__(self, pixelSize=0.05, threshold=0.9, backgroundDiskRadius=5,
                  wormDiskRadius=2):
@@ -71,7 +70,7 @@ class WormImageProcessor:
     def applyThreshold(self, image):
         junk, thresholded = cv2.threshold(image, 255*self.threshold,
                                           255, cv2.THRESH_BINARY)
-        return 255-thresholded
+        return np.equal(255-thresholded,255)
 
     def applyMorphologicalCleaning(self, image):
     	"""
@@ -89,7 +88,7 @@ class WormImageProcessor:
                                            (self.wormDiskRadius+1,
                                            	self.wormDiskRadius+1))
         imcl = cv2.morphologyEx(np.uint8(image), cv2.MORPH_CLOSE, wormSE)
-        imcl = np.equal(imcl, 255)
+        imcl = np.equal(imcl, 1)
         # fix defects by filling holes (filled = 1)
         imholes = np.logical_and(ndimage.binary_fill_holes(image),
                                  np.logical_not(image))
@@ -105,6 +104,7 @@ class WormImageProcessor:
                        if holeAreas[i] > self.holeAreaThreshold and
                        cv2.arcLength(hole, True)**2/holeAreas[i] >
                        self.compactnessThreshold]
+        imcl = np.uint8(imcl)
         for hole in holesToFill:
             cv2.drawContours(imcl, hole, 0, 1, cv2.cv.CV_FILLED)
         imcl = np.equal(imcl, 1)
@@ -132,8 +132,8 @@ class WormImageProcessor:
                  for i, contour
                  in enumerate(contours)}
         n = self.expectedWormAreaPixels()
-        l = n*self.wormIdentificationThresholdRange[0]
-        u = n*self.wormIdentificationThresholdRange[1]
+        l = n*self.wormAreaThresholdRange[0]
+        u = n*self.wormAreaThresholdRange[1]
         return [(contour, areas[i]) for i, contour in enumerate(contours)
                 if areas[i] > l and areas[i] < u]
 
@@ -164,25 +164,25 @@ class WormImageProcessor:
     def saveConfiguration(self, storeFile, path):
         with h5py.File(storeFile) as f:
             # check whether datasets exist
-            if path not in f:
-                g = f.create_group(path)
-                g.create_dataset('threshold', 1, dtype=float)
-                g.create_dataset('backgroundDiskRadius', 1,
-                                 dtype=np.uint8)
-                g.create_dataset('wormDiskRadius', 1, dtype=np.uint8)
-                g.create_dataset('pixelsPerMicron', 1, dtype=float)
-                g.create_dataset('holeAreaThreshold', 1, dtype=int)
-                g.create_dataset('compactnessThreshold', 1, dtype=float)
-                g.create_dataset('wormAreaThresholdRange', 2, dtype=float)
+            g = f.require_group(path)
+            g.require_dataset('threshold', (1,), dtype='float64')
+            g.require_dataset('backgroundDiskRadius', (1,),
+                              dtype='uint8')
+            g.require_dataset('wormDiskRadius', (1,), dtype='uint8')
+            g.require_dataset('pixelsPerMicron', (1,), dtype='float64')
+            g.require_dataset('holeAreaThreshold', (1,), dtype='uint8')
+            g.require_dataset('compactnessThreshold', (1,), dtype='float64')
+            g.require_dataset('wormAreaThresholdRange', (2,),
+                              dtype='float64')
             # write configuration
             g = f[path]
-            g['threshold'] = self.threshold
-            g['backgroundDiskRadius'] = self.backgroundDiskRadius
-            g['wormDiskRadius'] = self.wormDiskRadius
-            g['pixelsPerMicron'] = self.pixelsPerMicron
-            g['holeAreaThreshold'] = self.holeAreaThreshold
-            g['compactnessThreshold'] = self.compactnessThreshold
-            g['wormAreaThresholdRange'] = self.wormAreaThresholdRange
+            g['threshold'][...] = self.threshold
+            g['backgroundDiskRadius'][...] = self.backgroundDiskRadius
+            g['wormDiskRadius'][...] = self.wormDiskRadius
+            g['pixelsPerMicron'][...] = self.pixelSize
+            g['holeAreaThreshold'][...] = self.holeAreaThreshold
+            g['compactnessThreshold'][...] = self.compactnessThreshold
+            g['wormAreaThresholdRange'][...] = self.wormAreaThresholdRange
 
 
 def bwdiagfill(bwimage):

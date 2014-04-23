@@ -92,11 +92,9 @@ class CircleRegionSelector(object):
             print "Mouse must be released within the axes, try again."
 
     def draw_circle(self):
-        xhalf = abs(self.x1-self.x0)/2
-        yhalf = abs(self.y1-self.y0)/2
-        self.circle.center = (min(self.x0, self.x1)+xhalf,
-                              min(self.y0, self.y1)+yhalf)
-        self.circle.radius = min(xhalf, yhalf)
+        self.circle.center = (self.x0, self.y0)
+        self.circle.radius = np.sqrt((self.x1-self.x0)**2 +
+                                     (self.y1-self.y0)**2)
         self.ax.figure.canvas.draw()
 
     def asXYR(self):
