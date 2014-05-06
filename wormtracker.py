@@ -393,9 +393,13 @@ class WormVideoRegion:
                         # identify possible worms in image
                         # returns contours, areas
                         possibleWorms = ip.identifyPossibleWorms(bwFramev[0])
-                        # likely worm is the largest area
-                        likelyWorm = max(possibleWorms,
-                                         key=lambda worm: worm[1])
+                        if (possibleWorms is not None and
+                            len(possibleWorms) > 0):
+                            # likely worm is the largest area
+                            likelyWorm = max(possibleWorms,
+                                             key=lambda worm: worm[1])
+                        else:
+                            likelyWorm = None
 
                         if likelyWorm is not None:
                             # Create worm object which will measure
