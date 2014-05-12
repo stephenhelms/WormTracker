@@ -488,6 +488,8 @@ class WormImage:
     length = None
     posture = None
     meanBodyAngle = None
+    badSkeletonization = False
+    crossedWorm = False
 
     def __init__(self, videoRegion, grayFrame, bwFrame, wormContour):
         self.videoRegion = videoRegion
@@ -550,8 +552,8 @@ class WormImage:
     def calculateCentroid(self):
         moments = cv2.moments(self.wormContour)
         if moments['m00'] != 0:  # only calculate if there is a non-zero area
-            cx = int(moments['m10']/moments['m00'])  # cx = M10/M00
-            cy = int(moments['m01']/moments['m00'])
+            cx = moments['m10']/moments['m00']  # cx = M10/M00
+            cy = moments['m01']/moments['m00']
             self.centroid = np.flipud(self.toCroppedCoordinates([cx, cy]))
         else:
             self.centroid = None
@@ -648,6 +650,8 @@ class WormImage:
                               maxshape=(None, 1, 2), chunks=True,
                               dtype='int32')
             g.require_dataset('time', (1,), dtype='float64')
+            g.require_dataset('badSkeletonization', (1,), dtype='b')
+            g.require_dataset('crossedWorm', (1,), dtype='b')
             # write configuration
             g['boundingBox'][...] = np.array(self.boundingBox)
             g['bwWormImage'][...] = self.bwWormImage
@@ -656,6 +660,8 @@ class WormImage:
             rate = self.videoRegion.imageProcessor.frameRate
             g['time'][...] = np.float64(index)/rate
             g['centroid'][...] = self.centroid
+            g['badSkeletonization'][...] = self.badSkeletonization
+            g['crossedWorm'][...] = self.crossedWorm
             if not self.badSkeletonization:
                 g['skeleton'][...] = self.skeleton
                 g['skeletonSpline'][...] = self.skeletonSpline

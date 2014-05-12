@@ -177,6 +177,7 @@ class WormImageProcessor:
                 g.require_dataset('compactnessThreshold', (1,), dtype='float64')
                 g.require_dataset('wormAreaThresholdRange', (2,),
                                   dtype='float64')
+                g.require_dataset('frameRate', (1,), dtype='float64')
             # write configuration
             g['threshold'][...] = self.threshold
             g['backgroundDiskRadius'][...] = self.backgroundDiskRadius
@@ -185,6 +186,7 @@ class WormImageProcessor:
             g['holeAreaThreshold'][...] = self.holeAreaThreshold
             g['compactnessThreshold'][...] = self.compactnessThreshold
             g['wormAreaThresholdRange'][...] = self.wormAreaThresholdRange
+            g['frameRate'][...] = self.frameRate
 
 
 def bwdiagfill(bwimage):
