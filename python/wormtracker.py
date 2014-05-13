@@ -687,11 +687,13 @@ class WormImage:
                          0, self.outlineColor)
         plt.imshow(im)
         plt.hold(True)
-        plt.plot(self.skeleton[:, 1], self.skeleton[:, 0], '-',
-                 color=self.skeletonColor)
-        plt.scatter(self.skeletonSpline[1:-1, 1], self.skeletonSpline[1:-1, 0],
-                    c=self.posture, cmap=self.postureColormap, s=100)
-        plt.plot(self.centroid[1], self.centroid[0], 'o', ms=12,
+        if self.centroid is not None:
+            plt.plot(self.centroid[1], self.centroid[0], 'o', ms=12,
                  color=self.centroidColor)
-        plt.plot(self.midpoint[1], self.midpoint[0], 's', ms=12,
-                 color=self.midpointColor)
+        if not self.badSkeletonization:
+            plt.plot(self.skeleton[:, 1], self.skeleton[:, 0], '-',
+                     color=self.skeletonColor)
+            plt.scatter(self.skeletonSpline[1:-1, 1], self.skeletonSpline[1:-1, 0],
+                        c=self.posture, cmap=self.postureColormap, s=100)
+            plt.plot(self.midpoint[1], self.midpoint[0], 's', ms=12,
+                     color=self.midpointColor)
