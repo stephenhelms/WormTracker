@@ -485,6 +485,42 @@ class WormVideoRegion:
             g['cropRegion'][...] = self.cropRegion
             g['foodCircle'][...] = self.foodCircle
 
+            # create worm observation datasets
+            n = self.nFrames
+            g.require_dataset('boundingBox', (n, 4), dtype='int32')
+            g.require_dataset('bwWormImage', (n, 150, 150),
+                              maxshape=(n, None, None),
+                              chunks=True,
+                              compression='gzip', dtype='b')
+            g.require_dataset('grayWormImage', (n, 150, 150),
+                              maxshape=(n, None, None),
+                              chunks=True,
+                              compression='gzip', dtype='uint8')
+            g.require_dataset('skeleton', (n, 50, 2),
+                              maxshape=(n, 200, 2),
+                              chunks=True, dtype='int32')
+            g.require_dataset('skeletonSpline',
+                              (n, self.imageProcessor.nAngles, 2),
+                              maxshape=(n, 100, 2),
+                              chunks=True, dtype='float64')
+            g.require_dataset('centroid', (n, 2), dtype='float64')
+            g.require_dataset('midpoint', (n, 2), dtype='float64')
+            g.require_dataset('width', (n,), dtype='float64')
+            g.require_dataset('length', (n,), dtype='float64')
+            g.require_dataset('meanBodyAngle', (n,), dtype='float64')
+            g.require_dataset('posture', (n, self.imageProcessor.nAngles),
+                              maxshape=(n, 100), dtype='float64')
+            g.require_dataset('wormContour', (n, 2, 1, 2),
+                              maxshape=(n, None, 1, 2), chunks=True,
+                              fillvalue=-1,
+                              dtype='int32')
+            g.require_dataset('time', (n,), dtype='float64')
+            g.require_dataset('badSkeletonization', (n,), dtype='b')
+            g.require_dataset('crossedWorm', (n,), dtype='b')
+
+            rate = self.imageProcessor.frameRate
+            g['time'][...] = np.float64(range(n))/rate
+
 
 class WormImage:
     # default plot variables
@@ -641,56 +677,72 @@ class WormImage:
         else:
             mode = 'w'
         with h5py.File(storeFile, mode) as f:
-            pre = storePath + '/' + str(index)
+            pre = storePath
             # check whether datasets exist
             f.require_group(pre)
             g = f[pre]
-            g.require_dataset('boundingBox', (4,), dtype='int32')
-            g.require_dataset('bwWormImage', self.bwWormImage.shape,
-                              maxshape=self.videoRegion.frameSize,
-                              chunks=True,
-                              compression='gzip', dtype='b')
-            g.require_dataset('grayWormImage', self.grayWormImage.shape,
-                              maxshape=self.videoRegion.frameSize,
-                              chunks=True,
-                              compression='gzip', dtype='uint8')
-            g.require_dataset('skeleton', self.skeleton.shape,
-                              maxshape=(200, 2),
-                              chunks=True, dtype='int32')
-            g.require_dataset('skeletonSpline', self.skeletonSpline.shape,
-                              maxshape=(100, 2),
-                              chunks=True, dtype='float64')
-            g.require_dataset('centroid', (2,), dtype='float64')
-            g.require_dataset('midpoint', (2,), dtype='float64')
-            g.require_dataset('width', (1,), dtype='float64')
-            g.require_dataset('length', (1,), dtype='float64')
-            g.require_dataset('meanBodyAngle', (1,), dtype='float64')
-            g.require_dataset('posture', self.posture.shape,
-                              maxshape=(100,), dtype='float64')
-            g.require_dataset('wormContour', self.wormContour.shape,
-                              maxshape=(None, 1, 2), chunks=True,
-                              dtype='int32')
-            g.require_dataset('time', (1,), dtype='float64')
-            g.require_dataset('badSkeletonization', (1,), dtype='b')
-            g.require_dataset('crossedWorm', (1,), dtype='b')
+
             # write configuration
-            g['boundingBox'][...] = np.array(self.boundingBox)
-            g['bwWormImage'][...] = self.bwWormImage
-            g['grayWormImage'][...] = self.grayWormImage
-            g['wormContour'][...] = self.wormContour
-            rate = self.videoRegion.imageProcessor.frameRate
-            g['time'][...] = np.float64(index)/rate
-            g['centroid'][...] = self.centroid
-            g['badSkeletonization'][...] = self.badSkeletonization
-            g['crossedWorm'][...] = self.crossedWorm
+            n = self.videoRegion.nFrames
+            g['boundingBox'][index, :, :] = np.array(self.boundingBox)
+            g['centroid'][index, :] = self.centroid
+            g['badSkeletonization'][index] = self.badSkeletonization
+            g['crossedWorm'][index] = self.crossedWorm
             if not self.badSkeletonization:
-                g['skeleton'][...] = self.skeleton
-                g['skeletonSpline'][...] = self.skeletonSpline
-                g['midpoint'][...] = self.midpoint
-                g['width'][...] = self.width
-                g['length'][...] = self.length
-                g['meanBodyAngle'][...] = self.meanBodyAngle
-                g['posture'][...] = self.posture
+                g['midpoint'][index, :] = self.midpoint
+                g['width'][index] = self.width
+                g['length'][index] = self.length
+                g['meanBodyAngle'][index] = self.meanBodyAngle
+
+                s = self.skeleton.shape
+                if g['skeleton'].shape[1:] != s:
+                    g['skeleton'].resize((n,
+                                          max(g['skeleton'].shape[1],
+                                              s[0]),
+                                          2))
+                g['skeleton'][index, :s[0], :] = self.skeleton
+
+                s = self.skeletonSpline.shape
+                if g['skeletonSpline'].shape[1:] != s:
+                    g['skeletonSpline'].resize((n,
+                                                max(g['skeletonSpline'].shape[1],
+                                                s[0]),
+                                                2))
+                g['skeletonSpline'][index, :s[0], :] = self.skeletonSpline
+
+                s = self.posture.shape
+                if g['posture'].shape[1:] != s:
+                    g['posture'].resize((n,
+                                         max(g['posture'].shape[1],
+                                             s[0])))
+                g['posture'][index, :s[0]] = self.posture
+
+            s = self.bwWormImage.shape
+            if g['bwWormImage'].shape[1:] != s:
+                g['bwWormImage'].resize((n,
+                                        max(g['bwWormImage'].shape[1],
+                                            s[0]),
+                                        max(g['bwWormImage'].shape[2],
+                                            s[1])))
+            g['bwWormImage'][index, :s[0], :s[1]] = self.bwWormImage
+
+            s = self.grayWormImage.shape
+            if g['grayWormImage'].shape[1:] != s:
+                g['grayWormImage'].resize((n,
+                                           max(g['grayWormImage'].shape[1],
+                                               s[0]),
+                                           max(g['grayWormImage'].shape[2],
+                                               s[1])))
+            g['grayWormImage'][index, :s[0], :s[1]] = self.grayWormImage
+            
+            s = self.wormContour.shape
+            if g['wormContour'].shape[1:] != s:
+                g['wormContour'].resize((n,
+                                         max(g['wormContour'].shape[1],
+                                             s[0]),
+                                         1,
+                                         2))
+            g['wormContour'][index, :s[0], :, :] = self.wormContour
 
     def plot(self, bodyPtMarkerSize=100):
         if self.bwWormImage is None:
