@@ -89,26 +89,9 @@ class WormImageProcessor:
                                            	self.wormDiskRadius+1))
         imcl = cv2.morphologyEx(np.uint8(image), cv2.MORPH_CLOSE, wormSE)
         imcl = np.equal(imcl, 1)
-        # fix defects by filling holes (filled = 1)
-        imholes = np.logical_and(ndimage.binary_fill_holes(image),
-                                 np.logical_not(image))
-        # combine the two corrections by only filling holes of a certain size
-        holes, hierarchy = cv2.findContours(np.uint8(imholes), cv2.RETR_CCOMP,
-                                            cv2.CHAIN_APPROX_SIMPLE)
-        # fill holes in inverted closed image if
-        # compactness (perimeter^2/area) is above threshold and
-        # area is above threshold (This avoids filling an omega turn worm)
-        holeAreas = {i: cv2.contourArea(hole) for i, hole
-                     in enumerate(holes)}
-        holesToFill = [hole for i, hole in enumerate(holes)
-                       if holeAreas[i] > self.holeAreaThreshold and
-                       cv2.arcLength(hole, True)**2/holeAreas[i] >
-                       self.compactnessThreshold]
-        imcl = np.uint8(imcl)
-        for hole in holesToFill:
-            cv2.drawContours(imcl, hole, 0, 1, cv2.cv.CV_FILLED)
-        imcl = np.equal(imcl, 1)
-
+        # fix defects by filling holes
+        imholes = ndimage.binary_fill_holes(imcl)
+        imcl = np.logical_or(imholes, imcl)
         # fix barely touching regions
         # majority with worm pixels == 1 (median filter same?)
         imcl = nf.median_filter(imcl, footprint=[[1, 1, 1],
