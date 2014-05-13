@@ -105,6 +105,22 @@ class WormVideo:
             self.addRegion(tuple([int(round(x)) for x in region[0]]),
                            region[1], region[2])
 
+    def updateVideoFile(self, videoFile):
+        self.videoFile = videoFile
+        self.getNumberOfFrames()
+        for region in self.regions:
+            region.videoFile = videoFile
+            region.nFrames = self.nFrames
+
+    def getNumberOfFrames(self):
+        video = cv2.VideoCapture()
+        if video.open(self.videoFile):
+            success, firstFrame = video.read()
+            if not success:
+                raise Exception("Couldn't read video")
+            else:
+                self.nFrames = int(video.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+
     def addRegion(self, regionBounds, strain, name):
         """Adds the video region containing one worm.
 
@@ -118,6 +134,7 @@ class WormVideo:
                              resultsStorePath=self.resultsStorePath,
                              strainName=strain,
                              wormName=name)
+        wr.nFrames = self.nFrames
         self.regions.append(wr)
 
     def determinePixelSize(self):
@@ -279,9 +296,9 @@ class WormVideoRegion:
         self.generateThresholdedVideo()
         self.identifyWorm()
         # Clean up by deleting temporary video files
-        if os.path.exists(self.croppedFilteredVideoFile)
+        if os.path.exists(self.croppedFilteredVideoFile):
             os.remove(self.croppedFilteredVideoFile)
-        if os.path.exists(self.thresholdedVideoFile)
+        if os.path.exists(self.thresholdedVideoFile):
             os.remove(self.thresholdedVideoFile)
 
     def generateCroppedFilteredVideo(self):
@@ -332,7 +349,9 @@ class WormVideoRegion:
         tEndFilter = time.clock()
         print (self.strainName + ' ' + self.wormName +
                ": Filtering took " + str(tEndFilter-tStartFilter) + ' s.')
-        if os.path.exists('temp_' + self.croppedFilteredVideoFile)
+        croppedVideo.release()
+        filteredVideoOut.release()
+        if os.path.exists('temp_' + self.croppedFilteredVideoFile):
             os.remove('temp_' + self.croppedFilteredVideoFile)
 
     def _cropRegionForAvconv(self):
@@ -403,7 +422,7 @@ class WormVideoRegion:
                     graySuccess, bwFrame = bwVideo.read()
                     while bwSuccess and graySuccess:
                         tStart = time.clock()
-                        print (self.strainName + ' ' + self.wormName +
+                        print ('\r' + self.strainName + ' ' + self.wormName +
                                ": Identifying worm in frame " + str(count+1) +
                                ' of ' + str(nFrames))
                         # split the channels
@@ -444,7 +463,7 @@ class WormVideoRegion:
                         tEnd = time.clock()
                         tRemainEst = (np.float64(nFrames - count)*(tEnd-tStart)
                                       / 60.0)
-                        print (self.strainName + ' ' + self.wormName +
+                        print ('\r' + self.strainName + ' ' + self.wormName +
                                ": Expected to finish in " + str(tRemainEst) +
                                ' min.')
                 else:
@@ -487,36 +506,37 @@ class WormVideoRegion:
 
             # create worm observation datasets
             n = self.nFrames
-            g.require_dataset('boundingBox', (n, 4), dtype='int32')
-            g.require_dataset('bwWormImage', (n, 150, 150),
-                              maxshape=(n, None, None),
-                              chunks=True,
-                              compression='gzip', dtype='b')
-            g.require_dataset('grayWormImage', (n, 150, 150),
-                              maxshape=(n, None, None),
-                              chunks=True,
-                              compression='gzip', dtype='uint8')
-            g.require_dataset('skeleton', (n, 50, 2),
-                              maxshape=(n, 200, 2),
-                              chunks=True, dtype='int32')
-            g.require_dataset('skeletonSpline',
-                              (n, self.imageProcessor.nAngles, 2),
-                              maxshape=(n, 100, 2),
-                              chunks=True, dtype='float64')
-            g.require_dataset('centroid', (n, 2), dtype='float64')
-            g.require_dataset('midpoint', (n, 2), dtype='float64')
-            g.require_dataset('width', (n,), dtype='float64')
-            g.require_dataset('length', (n,), dtype='float64')
-            g.require_dataset('meanBodyAngle', (n,), dtype='float64')
-            g.require_dataset('posture', (n, self.imageProcessor.nAngles),
-                              maxshape=(n, 100), dtype='float64')
-            g.require_dataset('wormContour', (n, 2, 1, 2),
-                              maxshape=(n, None, 1, 2), chunks=True,
-                              fillvalue=-1,
-                              dtype='int32')
-            g.require_dataset('time', (n,), dtype='float64')
-            g.require_dataset('badSkeletonization', (n,), dtype='b')
-            g.require_dataset('crossedWorm', (n,), dtype='b')
+            if 'boundingBox' not in g:
+                g.create_dataset('boundingBox', (n, 4), dtype='int32')
+                g.create_dataset('bwWormImage', (n, 150, 150),
+                                 maxshape=(n, None, None),
+                                 chunks=True,
+                                 compression='gzip', dtype='b')
+                g.create_dataset('grayWormImage', (n, 150, 150),
+                                 maxshape=(n, None, None),
+                                 chunks=True,
+                                 compression='gzip', dtype='uint8')
+                g.create_dataset('skeleton', (n, 50, 2),
+                                 maxshape=(n, 200, 2),
+                                 chunks=True, dtype='int32')
+                g.create_dataset('skeletonSpline',
+                                 (n, self.imageProcessor.numberOfPosturePoints, 2),
+                                 maxshape=(n, 100, 2),
+                                 chunks=True, dtype='float64')
+                g.create_dataset('centroid', (n, 2), dtype='float64')
+                g.create_dataset('midpoint', (n, 2), dtype='float64')
+                g.create_dataset('width', (n,), dtype='float64')
+                g.create_dataset('length', (n,), dtype='float64')
+                g.create_dataset('meanBodyAngle', (n,), dtype='float64')
+                g.create_dataset('posture', (n, self.imageProcessor.numberOfPosturePoints),
+                                 maxshape=(n, 100), dtype='float64')
+                g.create_dataset('wormContour', (n, 2, 1, 2),
+                                 maxshape=(n, None, 1, 2), chunks=True,
+                                 fillvalue=-1,
+                                 dtype='int32')
+                g.create_dataset('time', (n,), dtype='float64')
+                g.create_dataset('badSkeletonization', (n,), dtype='b')
+                g.create_dataset('crossedWorm', (n,), dtype='b')
 
             rate = self.imageProcessor.frameRate
             g['time'][...] = np.float64(range(n))/rate
@@ -611,7 +631,8 @@ class WormImage:
         if moments['m00'] != 0:  # only calculate if there is a non-zero area
             cx = moments['m10']/moments['m00']  # cx = M10/M00
             cy = moments['m01']/moments['m00']
-            self.centroid = np.flipud(self.toCroppedCoordinates([cx, cy]))
+            self.centroid = self.toRegionCoordinates( \
+                np.flipud(self.toCroppedCoordinates([cx, cy])))
         else:
             self.centroid = None
 
@@ -647,7 +668,7 @@ class WormImage:
         fy = interpolate.UnivariateSpline(s/s[-1], pts[:, 1],
                                           s=self.smoothing*pts.shape[0])
         # find midpoint
-        self.midpoint = (fx(0.5), fy(0.5))
+        self.midpoint = self.toRegionCoordinates((fx(0.5), fy(0.5)))
         # calculate body angles
         nAngles = self.videoRegion.imageProcessor.numberOfPosturePoints
         theta = np.zeros(nAngles)
@@ -684,7 +705,7 @@ class WormImage:
 
             # write configuration
             n = self.videoRegion.nFrames
-            g['boundingBox'][index, :, :] = np.array(self.boundingBox)
+            g['boundingBox'][index, :] = np.array(self.boundingBox)
             g['centroid'][index, :] = self.centroid
             g['badSkeletonization'][index] = self.badSkeletonization
             g['crossedWorm'][index] = self.crossedWorm
@@ -760,7 +781,8 @@ class WormImage:
         plt.imshow(im, interpolation='none')
         plt.hold(True)
         if self.centroid is not None:
-            plt.plot(self.centroid[1], self.centroid[0], 'o', ms=12,
+            c = self.toCroppedCoordinates(self.centroid)
+            plt.plot(c[1], c[0], 'o', ms=12,
                  color=self.centroidColor)
         if not self.badSkeletonization:
             plt.plot(self.skeleton[:, 1], self.skeleton[:, 0], '-',
@@ -768,5 +790,6 @@ class WormImage:
             plt.scatter(self.skeletonSpline[1:-1, 1], self.skeletonSpline[1:-1, 0],
                         c=self.posture, cmap=self.postureColormap,
                         s=bodyPtMarkerSize)
-            plt.plot(self.midpoint[1], self.midpoint[0], 's', ms=12,
+            m = self.toCroppedCoordinates(self.midpoint)
+            plt.plot(m[1], m[0], 's', ms=12,
                      color=self.midpointColor)
