@@ -185,10 +185,10 @@ class WormVideo:
             if len(possibleWorms) > 0:
                 likelyWorm = max(possibleWorms, key=lambda worm: worm[1])
                 if likelyWorm is not None:
-                    wormImage = WormImage(region, filtered, thresholded,
+                    wormImage = WormImage(region, filtered, cleaned,
                                           likelyWorm[0])
                     wormImage.measureWorm()
-                    wormImage.plot()
+                    wormImage.plot(bodyPtMarkerSize=30)
             plt.title(region.strainName + ' ' + region.wormName)
         plt.show()
 
@@ -672,7 +672,7 @@ class WormImage:
                 g['meanBodyAngle'][...] = self.meanBodyAngle
                 g['posture'][...] = self.posture
 
-    def plot(self):
+    def plot(self, bodyPtMarkerSize=100):
         if self.bwWormImage is None:
             self.cropToWorm()
         if self.centroid is None:
@@ -685,7 +685,7 @@ class WormImage:
         cv2.drawContours(im,
                          [self.toCroppedCoordinates(self.wormContour)],
                          0, self.outlineColor)
-        plt.imshow(im)
+        plt.imshow(im, interpolation='none')
         plt.hold(True)
         if self.centroid is not None:
             plt.plot(self.centroid[1], self.centroid[0], 'o', ms=12,
@@ -694,6 +694,7 @@ class WormImage:
             plt.plot(self.skeleton[:, 1], self.skeleton[:, 0], '-',
                      color=self.skeletonColor)
             plt.scatter(self.skeletonSpline[1:-1, 1], self.skeletonSpline[1:-1, 0],
-                        c=self.posture, cmap=self.postureColormap, s=100)
+                        c=self.posture, cmap=self.postureColormap,
+                        s=bodyPtMarkerSize)
             plt.plot(self.midpoint[1], self.midpoint[0], 's', ms=12,
                      color=self.midpointColor)
