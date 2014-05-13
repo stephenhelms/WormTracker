@@ -175,7 +175,7 @@ class WormVideo:
     def testWormIdentification(self):
         plt.figure()
         for i, region in enumerate(self.regions):
-            plt.subplot(3, np.ceil(np.float64(self.numberOfRegions)/3.0), i+1)
+            plt.subplot(4, np.ceil(np.float64(self.numberOfRegions)/4.0), i+1)
             ip = self.imageProcessor
             cropped = wp.cropImageToRegion(self.firstFrame, region.cropRegion)
             filtered = ip.applyBackgroundFilter(cropped)
@@ -189,7 +189,7 @@ class WormVideo:
                                           likelyWorm[0])
                     wormImage.measureWorm()
                     wormImage.plot()
-        plt.title(region.strainName + ' ' + region.wormName)
+            plt.title(region.strainName + ' ' + region.wormName)
         plt.show()
 
     def saveConfiguration(self):
