@@ -172,6 +172,20 @@ class WormVideo:
         plt.title('Thresholded')
         plt.show()
 
+    def testMorphologicalCleaning(self, regionIdx):
+        plt.figure()
+        region = self.regions[regionIdx]
+        ip = self.imageProcessor
+        cropped = wp.cropImageToRegion(self.firstFrame, region.cropRegion)
+        filtered = ip.applyBackgroundFilter(cropped)
+        ax1 = plt.subplot(1,2,1)
+        thresholded = ip.applyThreshold(filtered)
+        plt.imshow(thresholded, plt.gray())
+        plt.subplot(1,2,2, sharex=ax1, sharey=ax1)
+        cleaned = ip.applyMorphologicalCleaning(thresholded)
+        plt.imshow(cleaned, plt.gray())
+        plt.show()
+
     def testWormIdentification(self):
         plt.figure()
         for i, region in enumerate(self.regions):
