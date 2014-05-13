@@ -278,6 +278,11 @@ class WormVideoRegion:
         self.generateCroppedFilteredVideo()
         self.generateThresholdedVideo()
         self.identifyWorm()
+        # Clean up by deleting temporary video files
+        if os.path.exists(self.croppedFilteredVideoFile)
+            os.remove(self.croppedFilteredVideoFile)
+        if os.path.exists(self.thresholdedVideoFile)
+            os.remove(self.thresholdedVideoFile)
 
     def generateCroppedFilteredVideo(self):
         """ Crops and filters the video frames """
@@ -327,7 +332,8 @@ class WormVideoRegion:
         tEndFilter = time.clock()
         print (self.strainName + ' ' + self.wormName +
                ": Filtering took " + str(tEndFilter-tStartFilter) + ' s.')
-        # TODO: Delete temporary cropped video
+        if os.path.exists('temp_' + self.croppedFilteredVideoFile)
+            os.remove('temp_' + self.croppedFilteredVideoFile)
 
     def _cropRegionForAvconv(self):
         return (str(self.cropRegion[2]) + ':' +
