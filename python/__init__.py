@@ -1,2 +1,1 @@
 
-libavPath = 'C:\\libav\\bin\\'
