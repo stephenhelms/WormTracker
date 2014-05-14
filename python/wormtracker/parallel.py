@@ -1,7 +1,22 @@
-import sys, os, cPickle, multiprocessing, time
-import wormtracker
+import os
+import multiprocessing
+import time
 
 # wormtracker.parallel
+
+
+def batchProcessVideos(wormVideos):
+    pool = multiprocessing.Pool()
+    results = []
+    for video in wormVideos:
+        video.saveConfiguration()
+        results.append(pool.map_async(processRegion, video.regions))
+
+    for result in results:
+        print result.get()
+    pool.close()
+    pool.join()
+    print 'Finished analyzing all regions'
 
 
 def parallelProcessRegions(wormVideo):
