@@ -13,15 +13,7 @@ import roitools
 import time
 import multiprocessing
 
-# Interactive script - replace VideoReader with the Python/OpenCV approach
-# (only need a single frame anyway)
-# Automated analysis, parallelized per worm (16/video in the new ones):
-
 # NOTE: Matlab crop indices are flipped (y,x,h,w) relative to Numpy arrays
-
-
-libavPath = 'C:\\libav\\bin\\'
-
 
 class WormVideo:
     imageProcessor = wp.WormImageProcessor()

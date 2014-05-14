@@ -1,0 +1,2 @@
+
+libavPath = 'C:\\libav\\bin\\'
