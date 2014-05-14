@@ -262,6 +262,7 @@ class WormVideo:
             print 'Analysis of region took ' + str(tDuration) + ' min.'
 
     def processRegionsParallel(self):
+        self.saveConfiguration()
         pool = multiprocessing.Pool()  # use as many CPU cores as you can
         #queue = multiprocessing.Queue()  # for messages
 
