@@ -11,6 +11,7 @@ import os
 import wormimageprocessor as wp
 import roitools
 import time
+import multiprocessing
 
 # Interactive script - replace VideoReader with the Python/OpenCV approach
 # (only need a single frame anyway)
@@ -261,7 +262,31 @@ class WormVideo:
             print 'Analysis of region took ' + str(tDuration) + ' min.'
 
     def processRegionsParallel(self):
-        raise NotImplemented()
+        pool = multiprocessing.Pool()  # use as many CPU cores as you can
+        jobs = []
+        queue = multiprocessing.Manager().Queue()  # for messages
+
+        # start a job for each region
+        def processRegion(region):
+            region.processParallel(queue)
+
+        for i, region in enumerate(self.regions):
+            # for now don't try writing in parallel to the same file
+            region.resultsStoreFile = str(i) + self.storeFile
+            print ('Starting analysis of ' + region.strainName + ' ' +
+                   region.wormName)
+            startTime = time.clock()
+            jobs.append(pool.map_async(processRegion, self.regions))
+        while any(not job.ready() for job in jobs):
+            if not queue.empty():
+                print queue.get()
+            time.sleep(1)
+
+        pool.close()
+        pool.join()
+        print 'Finished analyzing all regions'
+        # TODO: merge the output files
+
 
 
 class WormVideoRegion:
@@ -300,6 +325,29 @@ class WormVideoRegion:
             os.remove(self.croppedFilteredVideoFile)
         if os.path.exists(self.thresholdedVideoFile):
             os.remove(self.thresholdedVideoFile)
+
+    def processParallel(self, queue):
+        tStart = time.clock()
+        queue.add('Analysis of ' + self.strainName + ' worm ' +
+                  self.wormName + ' beginning...')
+        queue.add('Cropping ' + self.strainName + ' worm ' +
+                  self.wormName + ' beginning...')
+        self.generateCroppedFilteredVideo()
+        queue.add('Thresholding ' + self.strainName + ' worm ' +
+                  self.wormName + ' beginning...')
+        self.generateThresholdedVideo()
+        queue.add('Identifying worms in ' + self.strainName + ' worm ' +
+                  self.wormName + ' beginning...')
+        self.identifyWorm()
+        # Clean up by deleting temporary video files
+        if os.path.exists(self.croppedFilteredVideoFile):
+            os.remove(self.croppedFilteredVideoFile)
+        if os.path.exists(self.thresholdedVideoFile):
+            os.remove(self.thresholdedVideoFile)
+        tStop = time.clock()
+        tDuration = (tStop - tStart) / 60.0
+        queue.add('Analysis of ' + self.strainName + ' worm ' +
+                  self.wormName + ' took ' + tDuration + ' min.')
 
     def generateCroppedFilteredVideo(self):
         """ Crops and filters the video frames """
