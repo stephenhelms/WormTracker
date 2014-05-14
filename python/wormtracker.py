@@ -263,30 +263,33 @@ class WormVideo:
 
     def processRegionsParallel(self):
         pool = multiprocessing.Pool()  # use as many CPU cores as you can
-        jobs = []
-        queue = multiprocessing.Manager().Queue()  # for messages
+        #queue = multiprocessing.Queue()  # for messages
 
         # start a job for each region
-        def processRegion(region):
-            region.processParallel(queue)
+        queue = multiprocessing.Queue()
 
-        for i, region in enumerate(self.regions):
-            # for now don't try writing in parallel to the same file
-            region.resultsStoreFile = str(i) + self.storeFile
-            print ('Starting analysis of ' + region.strainName + ' ' +
-                   region.wormName)
-            startTime = time.clock()
-            jobs.append(pool.map_async(processRegion, self.regions))
-        while any(not job.ready() for job in jobs):
-            if not queue.empty():
-                print queue.get()
-            time.sleep(1)
+        
+        result = pool.map_async(_videoProcessRegionParallel, self.regions)
+        #jobs = []
+        #for region in self.regions:
+        #    jobs.append(pool.apply_async(_videoProcessRegionParallel,
+        #                                 region, queue))
 
+        #while any(not job.ready() for job in jobs) and not queue.empty():
+        #    if not queue.empty():
+        #        print queue.get()
+        #    time.sleep(1)
+
+        print result.get()
         pool.close()
         pool.join()
         print 'Finished analyzing all regions'
         # TODO: merge the output files
 
+_queue = multiprocessing.Queue()
+
+def _videoProcessRegionParallel(region):
+    return region.processParallel(_queue)
 
 
 class WormVideoRegion:
@@ -328,15 +331,15 @@ class WormVideoRegion:
 
     def processParallel(self, queue):
         tStart = time.clock()
-        queue.add('Analysis of ' + self.strainName + ' worm ' +
+        queue.put('Analysis of ' + self.strainName + ' worm ' +
                   self.wormName + ' beginning...')
-        queue.add('Cropping ' + self.strainName + ' worm ' +
+        queue.put('Cropping ' + self.strainName + ' worm ' +
                   self.wormName + ' beginning...')
         self.generateCroppedFilteredVideo()
-        queue.add('Thresholding ' + self.strainName + ' worm ' +
+        queue.put('Thresholding ' + self.strainName + ' worm ' +
                   self.wormName + ' beginning...')
         self.generateThresholdedVideo()
-        queue.add('Identifying worms in ' + self.strainName + ' worm ' +
+        queue.put('Identifying worms in ' + self.strainName + ' worm ' +
                   self.wormName + ' beginning...')
         self.identifyWorm()
         # Clean up by deleting temporary video files
@@ -346,8 +349,9 @@ class WormVideoRegion:
             os.remove(self.thresholdedVideoFile)
         tStop = time.clock()
         tDuration = (tStop - tStart) / 60.0
-        queue.add('Analysis of ' + self.strainName + ' worm ' +
-                  self.wormName + ' took ' + tDuration + ' min.')
+        queue.put('Analysis of ' + self.strainName + ' worm ' +
+                  self.wormName + ' took ' + str(tDuration) + ' min.')
+        return 'Success'
 
     def generateCroppedFilteredVideo(self):
         """ Crops and filters the video frames """
