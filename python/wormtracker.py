@@ -268,6 +268,12 @@ class WormVideo:
         # start a job for each region
         queue = multiprocessing.Queue()
 
+        # split output into different files
+        outputFiles = {}
+        for region in self.regions:
+            region.resultsStoreFile = (region.strainName + '_' + region.wormName +
+                                       '_' + self.storeFile)
+            outputFiles[region] = region.resultsStoreFile
         
         result = pool.map_async(_videoProcessRegionParallel, self.regions)
         #jobs = []
