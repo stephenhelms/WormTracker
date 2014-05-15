@@ -47,7 +47,7 @@ class WormVideo:
                 firstFrameChannels = cv2.split(firstFrame)
                 self.firstFrame = firstFrameChannels[0]
                 self.frameSize = self.firstFrame.shape
-                self.nFrames = video.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT)
+                self.nFrames = int(video.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
                 print 'Video has ' + str(self.nFrames) + ' frames.'
                 frameRate = video.get(cv2.cv.CV_CAP_PROP_FPS)
                 print 'Video reports ' + str(frameRate) + ' fps.'
