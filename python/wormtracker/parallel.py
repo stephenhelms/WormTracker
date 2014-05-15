@@ -1,10 +1,29 @@
-import sys, os, cPickle, multiprocessing, time
 from subprocess import check_output
+import sys
+import os
+import cPickle
+import multiprocessing
+import time
 import wormtracker as wt
 
 # wormtracker.parallel
 
 hdf5path = 'C:\\hdf5\\'
+
+
+def batchProcessVideos(wormVideos):
+    pool = multiprocessing.Pool()
+    results = []
+    for video in wormVideos:
+        video.saveConfiguration()
+        results.append(pool.map_async(processRegion, video.regions))
+
+    for result in results:
+        print result.get()
+    pool.close()
+    pool.join()
+    print 'Finished analyzing all regions'
+
 
 def parallelProcessRegions(wormVideo):
     wormVideo.saveConfiguration()
