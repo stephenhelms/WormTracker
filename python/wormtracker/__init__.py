@@ -693,7 +693,7 @@ class WormImage:
         if self.badSkeletonization:
             return
         # approximate width as 2*shortest path to contour at midpoint
-        mp = np.flipud(self.midpoint)
+        mp = np.flipud(self.toCroppedCoordinates(self.midpoint))
         self.outlineWorm()
         cpts = np.float64(cv2.findNonZero(np.uint8(self.outlinedWormImage)))
         self.width = (min(np.sqrt(np.sum(np.float64(cpts - mp)**2, axis=2)))
