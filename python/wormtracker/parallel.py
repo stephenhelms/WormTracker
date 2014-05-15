@@ -23,6 +23,8 @@ def batchProcessVideos(wormVideos):
     pool.close()
     pool.join()
     print 'Finished analyzing all regions'
+    for video in wormVideos:
+        cleanUpPostProcess(video)
 
 
 def parallelProcessRegions(wormVideo):
@@ -33,6 +35,7 @@ def parallelProcessRegions(wormVideo):
     pool.close()
     pool.join()
     print 'Finished analyzing all regions'
+    cleanUpPostProcess(wormVideo)
 
 
 def processRegion(region):
@@ -51,6 +54,8 @@ def processRegion(region):
     print 'Analysis of {0} {1} took {2} min.'.format(region.strainName,
                                                      region.wormName,
                                                      str(tDuration))
+    
+def cleanUpPostProcess(wormVideo):
     # merge results into original output file
     # should work
     path, name = os.path.split(wormVideo.storeFile)
