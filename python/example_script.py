@@ -1,7 +1,7 @@
 # import worm tracker package
 import os
 # Change this to the directory where the code is stored
-os.chdir('D://Documents/Stephen/Code/wormtracker-matlab')
+os.chdir('D://Stephen/Documents/Code/wormtracker-matlab/python')
 import wormtracker as wt
 
 # configure libav
