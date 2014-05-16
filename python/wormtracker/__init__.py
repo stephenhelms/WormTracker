@@ -300,9 +300,6 @@ class WormVideoRegion:
     frameSize = (2736, 2192)
     foodCircle = None
 
-    croppedFilteredVideoFile = None
-    thresholdedVideoFile = None
-
     def __init__(self, videoFile, imageProcessor, resultsStoreFile,
                  cropRegion, pixelSize,
                  resultsStorePath='/worms', outputPrefix=None,
@@ -321,222 +318,58 @@ class WormVideoRegion:
 
     def process(self):
         """ Processes the video region. """
-        self.generateCroppedFilteredVideo()
-        self.generateThresholdedVideo()
-        self.identifyWorm()
-        # Clean up by deleting temporary video files
-        if os.path.exists(self.croppedFilteredVideoFile):
-            os.remove(self.croppedFilteredVideoFile)
-        if os.path.exists(self.thresholdedVideoFile):
-            os.remove(self.thresholdedVideoFile)
-
-    def processParallel(self, queue):
-        tStart = time.clock()
-        queue.put('Analysis of ' + self.strainName + ' worm ' +
-                  self.wormName + ' beginning...')
-        queue.put('Cropping ' + self.strainName + ' worm ' +
-                  self.wormName + ' beginning...')
-        self.generateCroppedFilteredVideo()
-        queue.put('Thresholding ' + self.strainName + ' worm ' +
-                  self.wormName + ' beginning...')
-        self.generateThresholdedVideo()
-        queue.put('Identifying worms in ' + self.strainName + ' worm ' +
-                  self.wormName + ' beginning...')
-        self.identifyWorm()
-        # Clean up by deleting temporary video files
-        if os.path.exists(self.croppedFilteredVideoFile):
-            os.remove(self.croppedFilteredVideoFile)
-        if os.path.exists(self.thresholdedVideoFile):
-            os.remove(self.thresholdedVideoFile)
-        tStop = time.clock()
-        tDuration = (tStop - tStart) / 60.0
-        queue.put('Analysis of ' + self.strainName + ' worm ' +
-                  self.wormName + ' took ' + str(tDuration) + ' min.')
-        return 'Success'
-
-    def generateCroppedFilteredVideo(self):
-        """ Crops and filters the video frames """
-        if self.croppedFilteredVideoFile is None:
-            self.croppedFilteredVideoFile = self.outputPrefix + 'cropped.avi'
-
-        print (self.strainName + ' ' + self.wormName +
-               ": Generating cropped video using libav...")
-        tStart = time.clock()
         video = cv2.VideoCapture()
+        ii = 0  # frame counter
         if video.open(self.videoFile):
-            frameRate = video.get(cv2.cv.CV_CAP_PROP_FPS)
+            # loop through video frames
+            success, frame = video.read()
+            while success:
+                framev = cv2.split(frame)  # split the channels
+                tStart = time.clock()
+                self.processFrame(framev[0], ii)
+                tStop = time.clock()
+                tDuration = (tStop - tStart)
+                print 'Processing frame {0} of {1} took {2} s.'.format(
+                    str(ii+1), str(self.nFrames), str(tDuration))
+                # read next video frame
+                success, frame = video.read()
+                ii = ii+1
         else:
-            raise Exception('Could not open video.')
+            raise Exception('Error opening video in OpenCV.')
 
-        check_output([libavPath + 'avconv', '-i', self.videoFile, '-vf',
-                      'crop=' + self._cropRegionForAvconv(),
-                      '-r', str(int(frameRate)), '-c:v',
-                      'rawvideo', '-pix_fmt', 'yuv420p',
-                      '-y', 'temp_' + self.croppedFilteredVideoFile])
-        tEndCrop = time.clock()
-        print (self.strainName + ' ' + self.wormName +
-               ": Cropping took " + str(tEndCrop-tStart) + ' s.')
-
-        print (self.strainName + ' ' + self.wormName +
-               ": Bottom hat filtering frames...")
-        tStartFilter = time.clock()
-        croppedVideo = cv2.VideoCapture()
-        if croppedVideo.open('temp_' + self.croppedFilteredVideoFile):
-            filteredVideoOut = cv2.VideoWriter()
-            if filteredVideoOut.open(self.croppedFilteredVideoFile,
-                                     cv2.cv.CV_FOURCC('Y', '8', '0',
-                                                      '0'),
-                                     self.frameRate,
-                                     (self.cropRegion[2],
-                                      self.cropRegion[3]),
-                                     isColor=False):
-                # loop through video frames
-                success, frame = croppedVideo.read()
-                while success:
-                    framev = cv2.split(frame)  # split the channels
-                    # filter frame: inverted black hat filter
-                    filtered = \
-                        self.imageProcessor.applyBackgroundFilter(framev[0])
-                    # write frame to output
-                    filteredVideoOut.write(filtered)
-                    # read next video frame
-                    success, frame = croppedVideo.read()
-            else:
-                raise Exception('Error opening filtered video for ' +
-                                'writing in OpenCV.')
+    def processFrame(self, frame, idx):
+        # crop frame
+        cFrame = wp.cropImageToRegion(frame, self.cropRegion)
+        # filter frame
+        fFrame = self.imageProcessor.applyBackgroundFilter(cFrame)
+        # threshold frame
+        tFrame = self.imageProcessor.applyThreshold(fFrame)
+        # morphological cleaning
+        clFrame = self.imageProcessor.applyMorphologicalCleaning(tFrame)
+        # worm identification
+        ip = self.imageProcessor
+        # identify possible worms in image
+        # returns contours, areas
+        possibleWorms = ip.identifyPossibleWorms(clFrame)
+        if (possibleWorms is not None and len(possibleWorms) > 0):
+            # likely worm is the largest area
+            likelyWorm = max(possibleWorms, key=lambda worm: worm[1])
         else:
-            raise Exception('Error opening filtered video in OpenCV.')
-        tEndFilter = time.clock()
-        print (self.strainName + ' ' + self.wormName +
-               ": Filtering took " + str(tEndFilter-tStartFilter) + ' s.')
-        croppedVideo.release()
-        filteredVideoOut.release()
-        if os.path.exists('temp_' + self.croppedFilteredVideoFile):
-            os.remove('temp_' + self.croppedFilteredVideoFile)
+            likelyWorm = None
 
-    def _cropRegionForAvconv(self):
-        return (str(self.cropRegion[2]) + ':' +
-                str(self.cropRegion[3]) + ':' +
-                str(self.cropRegion[0]) + ':' +
-                str(self.cropRegion[1]))
+        if likelyWorm is not None:
+            # Create worm object which will measure
+            # the properties of the worm
+            worm = self.measureWorm(fFrame,
+                                    clFrame,
+                                    likelyWorm[0])
 
-    def generateThresholdedVideo(self):
-        """ Thresholds all the filtered frames and applies
-        morphological cleaning steps
-        """
-        if self.thresholdedVideoFile is None:
-            self.thresholdedVideoFile = self.outputPrefix + 'thresholded.avi'
-
-        print (self.strainName + ' ' + self.wormName +
-               ": Thresholding and cleaning video frames...")
-        tStart = time.clock()
-        filteredVideo = cv2.VideoCapture()
-        if filteredVideo.open(self.croppedFilteredVideoFile):
-            thresholdedVideoOut = cv2.VideoWriter()
-            if thresholdedVideoOut.open(self.thresholdedVideoFile,
-                                        cv2.cv.CV_FOURCC('Y', '8',
-                                                         '0', '0'),
-                                        self.frameRate,
-                                        (self.cropRegion[2],
-                                         self.cropRegion[3]),
-                                        isColor=False):
-                # loop through video frames
-                success, frame = filteredVideo.read()
-                while success:
-                    framev = cv2.split(frame)  # split the channels
-                    ip = self.imageProcessor
-                    thresholded = ip.applyThreshold(framev[0])
-                    cleaned = ip.applyMorphologicalCleaning(thresholded)
-                    # write frame to output
-                    thresholdedVideoOut.write(np.uint8(cleaned)*255)
-                    # read next video frame
-                    success, frame = filteredVideo.read()
-            else:
-                raise Exception('Error opening filtered video for ' +
-                                'writing in OpenCV.')
-        else:
-            raise Exception('Error opening filtered video in OpenCV.')
-        tStop = time.clock()
-        print (self.strainName + ' ' + self.wormName +
-               ": Thresholding and cleaning took " + str(tStop-tStart) + ' s.')
-        # TODO: call('avconv','-i',self.croppedFilteredVideoFile,'-vf','?')
-        # to figure out how to do this
-
-    def identifyWorm(self):
-        """ Loops through thresholded frames, identifies the likely worm,
-            measures its properties, and stores the result in the data store
-        """
-        print (self.strainName + ' ' + self.wormName +
-               ": Identifying worm in each frame...")
-        try:
-            bwVideo = cv2.VideoCapture()
-            if bwVideo.open(self.thresholdedVideoFile):
-                nFrames = bwVideo.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT)
-                grayVideo = cv2.VideoCapture()
-                if grayVideo.open(self.croppedFilteredVideoFile):
-                    # loop through video frames
-                    count = 0
-                    # read filtered video frame
-                    bwSuccess, grayFrame = grayVideo.read()
-                    # read thresholded video frame
-                    graySuccess, bwFrame = bwVideo.read()
-                    while bwSuccess and graySuccess:
-                        tStart = time.clock()
-                        print ('\r' + self.strainName + ' ' + self.wormName +
-                               ": Identifying worm in frame " + str(count+1) +
-                               ' of ' + str(nFrames))
-                        # split the channels
-                        bwFramev = cv2.split(bwFrame)
-                        grayFramev = cv2.split(grayFrame)
-
-                        ip = self.imageProcessor
-                        # identify possible worms in image
-                        # returns contours, areas
-                        possibleWorms = ip.identifyPossibleWorms(bwFramev[0])
-                        if (possibleWorms is not None and
-                            len(possibleWorms) > 0):
-                            # likely worm is the largest area
-                            likelyWorm = max(possibleWorms,
-                                             key=lambda worm: worm[1])
-                        else:
-                            likelyWorm = None
-
-                        if likelyWorm is not None:
-                            # Create worm object which will measure
-                            # the properties of the worm
-                            worm = self.measureWorm(grayFramev[0],
-                                                    np.equal(bwFramev[0], 1),
-                                                    likelyWorm[0])
-
-                            # write results to HDF5 store
-                            pre = (self.resultsStorePath + '/' +
-                                   self.strainName + '/' +
-                                   self.wormName)
-                            worm.store(self.resultsStoreFile,
-                                       pre, count)
-
-                        count += 1  # increment frame counter
-
-                        # read next video frame
-                        bwSuccess, grayFrame = grayVideo.read()
-                        graySuccess, bwFrame = bwVideo.read()
-                        tEnd = time.clock()
-                        tRemainEst = (np.float64(nFrames - count)*(tEnd-tStart)
-                                      / 60.0)
-                        print ('\r' + self.strainName + ' ' + self.wormName +
-                               ": Expected to finish in " + str(tRemainEst) +
-                               ' min.')
-                else:
-                    raise Exception('Error opening filtered video ' +
-                                    'in OpenCV.')
-            else:
-                raise Exception('Error opening thresholded video in ' +
-                                'OpenCV.')
-        except IOError as e:
-            print "I/O error({0}): {1}".format(e.errno, e.strerror)
-        except:
-            print "Unexpected error:", sys.exc_info()[0]
-            raise
+            # write results to HDF5 store
+            pre = (self.resultsStorePath + '/' +
+                   self.strainName + '/' +
+                   self.wormName)
+            worm.store(self.resultsStoreFile,
+                       pre, idx)
 
     def measureWorm(self, grayFrame, bwFrame, wormContour):
         worm = WormImage(self, grayFrame, bwFrame, wormContour)

@@ -15,9 +15,9 @@ Intel Core i7-2600K @ 3.4 GHz (8 threads)
 Windows 7
 64-bit Anaconda Python 2.7 environment
 
-Average time per frame was 0.0566308995761 s.
-Projected time for 1 hour of video for a single region: 37.7539330507 min.
-Projected time for 16 regions: 10.0677154802 h.
+Average time per frame was 0.074214055519 s.
+Projected time for 1 hour of video for a single region: 49.4760370126 min.
+Projected time for 16 regions: 13.19360987 h.
 """
 
 # configure libav
