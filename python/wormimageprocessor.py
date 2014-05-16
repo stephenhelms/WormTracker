@@ -5,6 +5,7 @@ from scipy import ndimage
 from scipy.ndimage import filters as nf
 import h5py
 import multiprocessing
+import numba
 
 """
 Black hat filter on a 6MP frame takes:
@@ -173,6 +174,7 @@ class WormImageProcessor:
             g['frameRate'][...] = self.frameRate
 
 
+@numba.autojit()
 def bwdiagfill(bwimage):
     """ clone of matlab's bwmorph(image,'diag') function? """
     # fills pixels matching the following neighborhoods:
@@ -195,7 +197,7 @@ def bwdiagfill(bwimage):
                                ndimage.binary_hit_or_miss(bwimage, hood))
     return output
 
-
+@numba.autojit()
 def find1Cpixels(bwImage):
     """ identifies 1-connected pixels in image """
     # fills pixels matching the following neighborhoods:
