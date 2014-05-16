@@ -362,8 +362,15 @@ class WormVideoRegion:
         print (self.strainName + ' ' + self.wormName +
                ": Generating cropped video using libav...")
         tStart = time.clock()
+        video = cv2.VideoCapture()
+        if video.open(self.videoFile):
+            frameRate = video.get(cv2.cv.CV_CAP_PROP_FPS)
+        else:
+            raise Exception('Could not open video.')
+
         check_output([libavPath + 'avconv', '-i', self.videoFile, '-vf',
-                      'crop=' + self._cropRegionForAvconv(), '-c:v',
+                      'crop=' + self._cropRegionForAvconv(),
+                      '-r', str(int(frameRate)), '-c:v',
                       'rawvideo', '-pix_fmt', 'yuv420p',
                       '-y', 'temp_' + self.croppedFilteredVideoFile])
         tEndCrop = time.clock()
@@ -411,7 +418,7 @@ class WormVideoRegion:
         return (str(self.cropRegion[2]) + ':' +
                 str(self.cropRegion[3]) + ':' +
                 str(self.cropRegion[0]) + ':' +
-                str(self.cropRegion[1]) + ':')
+                str(self.cropRegion[1]))
 
     def generateThresholdedVideo(self):
         """ Thresholds all the filtered frames and applies
