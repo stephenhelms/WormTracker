@@ -3,24 +3,9 @@ import numpy as np
 import numpy.ma as ma
 import matplotlib.pyplot as plt
 import h5py
-
-dataFile = 'D:\\2014-04-14_n2_a_b_day_7_processed.h5'
-
-f = h5py.File(dataFile, 'r')
-
-os.chdir('D:\\Stephen\\Documents\\Code\\wormtracker-matlab')
-
-# Get strain list
-strains = f['worms'].keys()
-
-# Get worm ID list for each strain
-wormIDs = {}
-
-for strain in strains:
-    wormIDs[strain] = [k for k, v in f['worms'][strain].items() if isinstance(v, h5py.Group)]
-
-# Test case
-worm = ('N2', '1')
+import itertools
+import cv2
+import wormimageprocessor as wip
 
 def acf(x, lags=500):
     # from stackexchange
@@ -28,56 +13,79 @@ def acf(x, lags=500):
     if len(lags) == 1:
         lags = range(1, lags)
 
-    return numpy.array([1]+[numpy.corrcoef(x[:-i], x[i:])[0, 1] \
+    return np.array([1]+[np.corrcoef(x[:-i], x[i:])[0, 1] \
         for i in lags])
 
 
 class WormTrajectory:
-    def __init__(self, h5obj, strain, wormID):
-        self.h5ref = h5obj['worms'][strain][wormID]
-        self.frameRate = 11.5
-        self.pixelsPerMicron = h5obj['video']['pixelsPerMicron'][...]
-        self.foodCircle = self.h5ref['foodCircle'][...] / self.pixelsPerMicron
+    filterByWidth = False
+    firstFrame = None
+    attr = {}
 
-        self.frames = [v for v in self.h5ref.values()
-                       if isinstance(v, h5py.Group)]
-        self.frames.sort(cmp=lambda f1, f2: (int(f1.name.split('/')[-1]) >
-                                             int(f2.name.split('/')[-1])))
-        self.maxFrameNumber = max(int(f.name.split('/')[-1])
-        	                      for f in self.frames) + 1
-        self.t = ma.array(range(0, self.maxFrameNumber))/self.frameRate
-        self.X = ma.zeros((self.maxFrameNumber,2))
-        self.v = ma.zeros((self.maxFrameNumber,2))
+    def __init__(self, h5obj, strain, wormID, videoFilePath=None):
+        self.h5ref = h5obj['worms'][strain][wormID]
+        self.strain = strain
+        self.wormID = wormID
+        self.frameRate = h5obj['/video/frameRate'][...]
+        self.pixelsPerMicron = h5obj['/video/pixelsPerMicron'][...]
+        self.foodCircle = self.h5ref['foodCircle'][...] / self.pixelsPerMicron
+        self.t = self.h5ref['time'][...]
+        self.maxFrameNumber = self.t.shape[0]
+        self.X = ma.array(self.h5ref['centroid'][...] / self.pixelsPerMicron)
+        self.v = ma.zeros(self.X.shape)
         self.s = ma.zeros((self.maxFrameNumber,))
-        self.phi = ma.empty((self.maxFrameNumber,))
+        self.phi = ma.zeros((self.maxFrameNumber,))
         self.length = np.NaN
         self.width = np.NaN
+        self.badFrames = np.zeros((self.maxFrameNumber,), dtype='bool')
+        if videoFilePath is not None:
+            videoFile = h5obj['/video/videoFile']
+            self.videoFile = os.path.join(videoFilePath, videoFile)
+        else:
+            self.videoFile = None
+
         #self.psiEnds = np.empty((self.maxFrameNumber,2)) * np.NaN
         #self.psi = np.empty((self.maxFrameNumber,)) * np.NaN
         #self.dpsi = np.empty((self.maxFrameNumber,)) * np.NaN
         #self.state = np.empty((self.maxFrameNumber,)) * np.NaN
         #self.theta = np.empty((self.maxFrameNumber,self.numberAngles)) * np.NaN
 
-    def identifyBadFrames(self):
-        lengths = ma.zeros((self.maxFrameNumber,))
-        widths = ma.zeros((self.maxFrameNumber,))
-        for frame in self.frames:
-            n = int(frame.name.split('/')[-1])
-            lengths[n] = frame['length'][...]
-            widths[n] = frame['width'][...]
+    def readFirstFrame(self):
+        if videoFile is None:
+            self.firstFrame = None
+            return
+        video = cv2.VideoCapture()
+        if video.open(self.videoFile):
+            success, firstFrame = video.read()
+            if not success:
+                raise Exception("Couldn't read video")
+            else:
+                firstFrameChannels = cv2.split(firstFrame)
+                frame = firstFrameChannels[0]
+                frame = wip.cropImageToRegion(frame, self.bou)
+        else:
+            raise Exception("Couldn't open video")
 
-        badFrames = np.logical_or(lengths.filled() == 0,
-        	                      widths.filled() == 0)
-        lengths.mask = badFrames
-        widths.mask = badFrames
-        self.length = np.median(lengths.compressed())
-        self.width = np.median(widths.compressed())
-        badFrames = np.logical_or(badFrames,
-            np.logical_or(np.logical_or(lengths < 0.8*self.length,
-                                        lengths > 1.2*self.length),
-                          np.logical_or(widths < 0.5*self.width,
-                                        widths > 1.5*self.width)))
-        self.badFrames = badFrames.filled()
+    def identifyBadFrames(self):
+        lengths = self.h5ref['length'][...]
+        widths = self.h5ref['width'][...]
+        
+        badFrames = np.logical_or(lengths == 0,
+        	                      widths == 0)
+        
+        self.length = np.median(lengths[np.logical_not(badFrames)])
+        self.width = np.median(widths[np.logical_not(badFrames)])
+        if self.filterByWidth:
+            badFrames = np.logical_or(badFrames,
+                np.logical_or(np.logical_or(lengths < 0.8*self.length,
+                                            lengths > 1.2*self.length),
+                              np.logical_or(widths < 0.5*self.width,
+                                            widths > 1.5*self.width)))
+        else:
+            badFrames = np.logical_or(badFrames,
+                np.logical_or(lengths < 0.8*self.length,
+                              lengths > 1.2*self.length))
+        self.badFrames = badFrames
 
     def excludeBadFrames(self):
         self.X[self.badFrames, :] = ma.masked
@@ -86,11 +94,6 @@ class WormTrajectory:
         self.phi[self.badFrames] = ma.masked
 
     def extractCentroidMeasurements(self):
-        for frame in self.frames:
-            n = int(frame.name.split('/')[-1])
-            self.X[n, :] = frame['centroid'][...] + frame['boundingBox'][0:2]
-
-        self.X = self.X / self.pixelsPerMicron
         self.X[self.badFrames, :] = ma.masked
         self.v[1:-1] = (self.X[2:, :] - self.X[0:-2])/(2.0/self.frameRate)
         self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
@@ -200,8 +203,8 @@ class WormTrajectory:
         # add head assignment algorithm
         raise NotImplemented()
 
-    def plotTrajectory(self):
-        plt.scatter(self.X[:, 0], self.X[:, 1])
+    def plotTrajectory(self, color='k', showPlot=True):
+        plt.scatter(self.X[:, 0], self.X[:, 1], c=color, s=10)
         plt.hold(True)
         circle = plt.Circle(self.foodCircle[0:2], radius=self.foodCircle[-1],
         	                color='r', fill=False)
@@ -210,53 +213,213 @@ class WormTrajectory:
         plt.ylim((0, 10000))
         plt.xlabel('x (um)')
         plt.xlabel('y (um)')
-        plt.show()
+        plt.gca().set_aspect('equal')
+        if showPlot:
+            plt.show()
 
-    def plotSpeed(self):
+    def plotSpeed(self, showPlot=True):
         plt.plot(self.t, self.s, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Speed (um/s)')
-        plt.show()
+        if showPlot:
+            plt.show()
 
     def plotBearing(self):
         plt.plot(self.t, self.phi/np.pi, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Bearing ($\pi$ rad)')
-        plt.show()
+        if showPlot:
+            plt.show()
 
-    def plotSpeedDistribution(self, bins=None):
+    def getSpeedDistribution(self, bins=None):
         if bins is None:
             bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
 
-        plt.hist(self.s.compressed(), bins, normed=True)
+        out = np.histogram(self.s.compressed(), bins,
+                           density=True)
+        return out
+
+    def plotSpeedDistribution(self, bins=None, color='k', showPlot=True):
+        if bins is None:
+            bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
+
+        plt.hist(self.s.compressed(), bins, normed=True, facecolor=color)
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
-        plt.show()
+        if showPlot:
+            plt.show()
+
+    def getSpeedAutocorrelation(self, maxT=100):
+        n = np.round(maxT*self.frameRate)
+        tau = range(n)/self.frameRate
+        C = acf(self.s, n)
+        return tau, C
 
     def plotSpeedAutocorrelation(self, maxT=100):
-    	n = np.round(maxT*self.frameRate)
-    	tau = range(n)/self.frameRate
-    	acf = acf(self.s, n)
-    	plt.semilogx(tau, acf, 'k-')
-    	xlabel(r'$\log \tau / (s)$')
-    	ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+    	tau, C = self.getSpeedAutocorrelation(maxT)
+        plt.semilogx(tau, C, 'k-')
+    	plt.xlabel(r'$\log \tau / (s)$')
+    	plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
 
     def plotBearingAutocorrelation(self, maxT=100):
     	n = np.round(maxT*self.frameRate)
     	tau = range(n)/self.frameRate
 
+    def getMeanSquaredDisplacement(self, tau=None):
+        if tau is None:
+            tau = np.logspace(-1,3,200)
 
-    def plotMeanSquaredDisplacement(self):
-        tau = np.logspace(-1,3,200)
         lags = np.round(tau*self.frameRate)
         Sigma = ma.zeros((200,))
         for i, lag in enumerate(lags):
             displacements = self.X[lag:, :] - self.X[:-lag, :]
             Sigma[i] = np.mean(np.log10(np.sum(displacements**2, axis=1)))
 
+        return (tau, Sigma)
+
+    def plotMeanSquaredDisplacement(self, tau=None):
+        tau, Sigma = self.getMeanSquaredDisplacement(tau)
         plt.plot(np.log10(tau), Sigma, 'k.')
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
         plt.show()
 
-        return (tau,Sigma)
+
+def bootstrap(array, nSamples=1000):
+    nObserv, nVar = array.shape
+    mu = np.zeros((nSamples, nVar))
+    replaceIdx = np.random.randint(nObserv, size=(nSamples, 2))
+    for i, (iold, inew) in enumerate(replaceIdx):
+        resampled = array.copy()
+        resampled[iold, :] = resampled[inew, :]
+        mu[i, :] = np.mean(resampled, axis=0)
+
+    return (np.mean(mu, axis=0),
+            np.percentile(mu, 2.5, axis=0),
+            np.percentile(mu, 97.5, axis=0))
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)
+
+
+class WormTrajectoryEnsemble:
+    def __init__(self, trajectoryIter=None, nameFunc=None):
+        if any(not isinstance(it, WormTrajectory) for it in trajectoryIter):
+            raise TypeError('A trajectory ensemble must contain ' +
+                            'WormTrajectory objects.')
+        self._trajectories = list(trajectoryIter)
+        if nameFunc is None:
+            nameFunc = lambda t: t.strain + ' ' + t.wormID
+        self.nameFunc = nameFunc
+
+    def __iter__(self):
+        for traj in self._trajectories:
+            yield traj
+
+    def __getitem__(self, key):
+        return self._trajectories[key]
+
+    def __setitem__(self, key, value):
+        self._trajectories[key] = value
+
+    def __delitem__(self, key):
+        del self._trajectories
+
+    def __contains__(self, value):
+        return value in self._trajectories
+
+    def __len__(self):
+        return len(self._trajectories)
+
+    def __getslice__(self, i, j):
+        return WormTrajectoryEnsemble(self._trajectories[i:j])
+
+    def __setslice__(self, i, j, sequence):
+        self._trajectories[i:j] = sequence
+
+    def __delslice__(self, i, j):
+        del self._trajectories[i:j]
+
+    def sort(self, cmp=None, key=None):
+        if cmp is None and key is None:
+            key = lambda t: int(t.wormID)
+        self._trajectories.sort(cmp=cmp, key=key)
+
+    def processAll(self):
+        for t in self:
+            t.identifyBadFrames()
+            t.extractCentroidMeasurements()
+
+    def ensembleAverage(self, compFunc, nSamples=1000):
+        samples = np.array([compFunc(traj) for traj in self])
+        return bootstrap(samples, nSamples)
+
+    def tilePlots(self, plotFunc):
+        plt.figure()
+        for i, t in enumerate(self):
+            plt.subplot(4, np.ceil(len(self)/4), i+1)
+            plotFunc(t)
+            plt.title(self.nameFunc(t))
+        plt.show()
+
+    def plotSpeedDistribution(self, color='k', showPlot=True):
+        bins = np.linspace(0, 500, 200)
+        p, pl, pu = self.ensembleAverage(lambda x: x.getSpeedDistribution(bins)[0])
+        centers = [(x1+x2)/2 for x1, x2 in pairwise(bins)]
+        plt.plot(centers, p, '.-', color=color)
+        plt.hold(True)
+        plt.fill_between(centers, pl, pu, facecolor=color, alpha=0.3)
+        plt.xlabel('Speed (um/s)')
+        plt.ylabel('Probability')
+        plt.xlim([0,max(bins)])
+        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
+        if showPlot:
+            plt.show()
+
+    def plotSpeedDistributions(self, showPlot=True):
+        bins = np.linspace(0, 500, 200)
+        centers = [(x1+x2)/2 for x1, x2 in pairwise(bins)]
+        for i, t in enumerate(self):
+            color = plt.cm.jet(float(i)/float(len(self)-1))
+            p = t.getSpeedDistribution(bins)[0]
+            plt.plot(centers,p,'.-',color=color,
+                     label=self.nameFunc(t))
+            plt.hold(True)
+        plt.xlabel('Speed (um/s)')
+        plt.ylabel('Probability')
+        plt.xlim([0, max(bins)])
+        plt.legend()
+        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
+        if showPlot:
+            plt.show()
+
+    def plotSpeedAutocorrelation(self, maxT=100, color='k', showPlot=True):
+        # assume all same frame rate
+        n = np.round(maxT*self[0].frameRate)
+        tau = range(n)/self[0].frameRate
+        C, Cl, Cu = self.ensembleAverage(lambda x: x.getSpeedAutocorrelation(maxT)[1])
+        plt.semilogx(tau, C, '.-', color=color)
+        plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
+        plt.xlabel(r'$\log \tau / (s)$')
+        plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
+        # TODO: smart xlim
+        if showPlot:
+            plt.show()
+
+    def plotMeanSquaredDisplacement(self, tau=None, color='k', showPlot=True):
+        tau = np.logspace(-1,3,200)
+        S, Sl, Su = self.ensembleAverage(lambda x: x.getMeanSquaredDisplacement(tau)[1])
+        log_tau = np.log10(tau)
+        plt.plot(log_tau, S, '.-', color=color)
+        plt.hold(True)
+        plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
+        plt.xlabel(r'log $\tau$ \ (s)')
+        plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
+        if showPlot:
+            plt.show()
