@@ -41,7 +41,6 @@ def parallelProcessRegions(wormVideo):
 def processRegion(region):
     print 'Starting analysis of {0} {1}'.format(region.strainName,
                                                 region.wormName)
-    originalOutput = region.resultsStoreFile
     # split output to a different file
     path, name = os.path.split(region.resultsStoreFile)
     newName = (region.strainName+'_'+region.wormName+'_'+name)
@@ -54,28 +53,32 @@ def processRegion(region):
     print 'Analysis of {0} {1} took {2} min.'.format(region.strainName,
                                                      region.wormName,
                                                      str(tDuration))
-    
+
 def cleanUpPostProcess(wormVideo):
     # merge results into original output file
     # should work
     path, name = os.path.split(wormVideo.storeFile)
     outputFile = os.path.join(path, 'merge_' + name)
 
-    # copy video info
-    print 'Merging HDF5 output files...'
-    obj = '\"/video\"'
-    c = [hdf5path + 'h5copy', '-i', os.path.join(path, name), '-o',
-         outputFile, '-s', obj, '-d', obj, '-p']
-    print check_output(' '.join(c))
+    try:
+        # copy video info
+        print 'Merging HDF5 output files...'
+        obj = '\"/video\"'
+        c = [hdf5path + 'h5copy', '-i', os.path.join(path, name), '-o',
+             outputFile, '-s', obj, '-d', obj, '-p']
+        print check_output(' '.join(c))
 
-    # copy region files
-    cmds = [' '.join([hdf5path + 'h5copy', '-i', os.path.join(path,
-                                                              '{1}_{2}_{0}'),
-                     '-o', os.path.join(path, 'merge_{0}'), '-s',
-                     '\"/worms/{1}/{2}\"','-d', '\"/worms/{1}/{2}\"',
-                     '-p']).format(name,
-                                   region.strainName,
-                                   region.wormName)
-            for region in wormVideo.regions]
-    for c in cmds:
-        print check_output(c)
+        # copy region files
+        cmds = [' '.join([hdf5path + 'h5copy', '-i', os.path.join(path,
+                                                                  '{1}_{2}_{0}'),
+                          '-o', os.path.join(path, 'merge_{0}'), '-s',
+                          '\"/worms/{1}/{2}\"','-d', '\"/worms/{1}/{2}\"',
+                          '-p']).format(name,
+                                        region.strainName,
+                                        region.wormName)
+                for region in wormVideo.regions]
+        for c in cmds:
+            print check_output(c)
+    except(Exception) as e:
+        print 'Error cleaning up:'
+        print e
