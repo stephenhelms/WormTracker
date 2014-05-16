@@ -4,6 +4,7 @@ import numpy as np
 from scipy import ndimage
 from scipy.ndimage import filters as nf
 import h5py
+import multiprocessing
 
 """
 Black hat filter on a 6MP frame takes:
@@ -228,3 +229,7 @@ def find1Cpixels(bwImage):
         output = np.logical_or(output,
                                ndimage.binary_hit_or_miss(bwImage, hood))
     return output
+
+
+if __name__ == '__main__':
+  multiprocessing.freeze_support()
