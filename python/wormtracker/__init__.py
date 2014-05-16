@@ -326,7 +326,7 @@ class WormVideoRegion:
             while success:
                 framev = cv2.split(frame)  # split the channels
                 tStart = time.clock()
-                self.processFrame(framev[0])
+                self.processFrame(framev[0], ii)
                 tStop = time.clock()
                 tDuration = (tStop - tStart)
                 print 'Processing frame {0} of {1} took {2} s.'.format(
