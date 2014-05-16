@@ -1,20 +1,40 @@
 import os
 import numpy as np
 import numpy.ma as ma
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import h5py
 import itertools
 import cv2
 import wormimageprocessor as wip
 
+
+def configureMatplotLibStyle():
+    mpl.rcParams['font.family'] = 'sans-serif'
+    mpl.rcParams['font.size'] = 8
+    mpl.rcParams['axes.labelsize'] = 'x-large'
+    mpl.rcParams['axes.titlesize'] = 'x-large'
+    mpl.rcParams['grid.color'] = (0.5, 0.5, 0.5)
+    mpl.rcParams['legend.fontsize'] = 'medium'
+    mpl.rcParams['legend.numpoints'] = 1
+    mpl.rcParams['legend.frameon'] = False
+
+
 def acf(x, lags=500):
     # from stackexchange
     x = x - np.mean(x)  # remove mean
-    if len(lags) == 1:
+    if type(lags) is int:
         lags = range(1, lags)
 
     return np.array([1]+[np.corrcoef(x[:-i], x[i:])[0, 1] \
         for i in lags])
+
+
+def dotacf(x, lags=500):
+    if type(lags) is int:
+        lags = xrange(lags)
+    return [np.mean(np.dot(x[l:, :], x[:l, :]), axis=0)
+            for l in lags]
 
 
 class WormTrajectory:
@@ -23,6 +43,7 @@ class WormTrajectory:
     attr = {}
 
     def __init__(self, h5obj, strain, wormID, videoFilePath=None):
+        self.h5obj = h5obj
         self.h5ref = h5obj['worms'][strain][wormID]
         self.strain = strain
         self.wormID = wormID
@@ -39,7 +60,7 @@ class WormTrajectory:
         self.width = np.NaN
         self.badFrames = np.zeros((self.maxFrameNumber,), dtype='bool')
         if videoFilePath is not None:
-            videoFile = h5obj['/video/videoFile']
+            videoFile = h5obj['/video/videoFile'][0]
             self.videoFile = os.path.join(videoFilePath, videoFile)
         else:
             self.videoFile = None
@@ -51,7 +72,7 @@ class WormTrajectory:
         #self.theta = np.empty((self.maxFrameNumber,self.numberAngles)) * np.NaN
 
     def readFirstFrame(self):
-        if videoFile is None:
+        if self.videoFile is None:
             self.firstFrame = None
             return
         video = cv2.VideoCapture()
@@ -62,9 +83,29 @@ class WormTrajectory:
             else:
                 firstFrameChannels = cv2.split(firstFrame)
                 frame = firstFrameChannels[0]
-                frame = wip.cropImageToRegion(frame, self.bou)
+                crop = self.h5ref['cropRegion'][...]
+                frame = wip.cropImageToRegion(frame, crop)
+                ip = self.getImageProcessor()
+                frame = ip.applyBackgroundFilter(frame)
+                self.firstFrame = cv2.normalize(frame,
+                                                alpha=0,
+                                                beta=255,
+                                                norm_type=cv2.NORM_MINMAX)
         else:
             raise Exception("Couldn't open video")
+
+    def getImageProcessor(self):
+        ip = wip.WormImageProcessor()
+        ip.backgroundDiskRadius = \
+            self.h5obj['/video/backgroundDiskRadius'][0]
+        ip.pixelSize = self.h5obj['/video/pixelsPerMicron'][0]
+        ip.threshold = self.h5obj['/video/threshold'][0]
+        ip.wormDiskRadius = self.h5obj['/video/wormDiskRadius'][0]
+        ip.wormAreaThresholdRange = \
+            self.h5obj['/video/wormAreaThresholdRange'][...]
+        # length
+        # width
+        return ip
 
     def identifyBadFrames(self):
         lengths = self.h5ref['length'][...]
@@ -203,7 +244,15 @@ class WormTrajectory:
         # add head assignment algorithm
         raise NotImplemented()
 
-    def plotTrajectory(self, color='k', showPlot=True):
+    def plotTrajectory(self, color='k', showFrame=True, showPlot=True):
+        if showFrame and self.firstFrame is not None:
+            plt.imshow(self.firstFrame, plt.gray(),
+                       origin='lower',
+                       extent=(0,
+                               self.firstFrame.shape[1]/self.pixelsPerMicron,
+                               0,
+                               self.firstFrame.shape[0]/self.pixelsPerMicron))
+            plt.hold(True)
         plt.scatter(self.X[:, 0], self.X[:, 1], c=color, s=10)
         plt.hold(True)
         circle = plt.Circle(self.foodCircle[0:2], radius=self.foodCircle[-1],
@@ -224,7 +273,7 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
-    def plotBearing(self):
+    def plotBearing(self, showPlot=True):
         plt.plot(self.t, self.phi/np.pi, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Bearing ($\pi$ rad)')
@@ -307,11 +356,12 @@ def pairwise(iterable):
 
 
 class WormTrajectoryEnsemble:
-    def __init__(self, trajectoryIter=None, nameFunc=None):
+    def __init__(self, trajectoryIter=None, name=None, nameFunc=None):
         if any(not isinstance(it, WormTrajectory) for it in trajectoryIter):
             raise TypeError('A trajectory ensemble must contain ' +
                             'WormTrajectory objects.')
         self._trajectories = list(trajectoryIter)
+        self.name = name
         if nameFunc is None:
             nameFunc = lambda t: t.strain + ' ' + t.wormID
         self.nameFunc = nameFunc
@@ -351,6 +401,7 @@ class WormTrajectoryEnsemble:
 
     def processAll(self):
         for t in self:
+            t.readFirstFrame()
             t.identifyBadFrames()
             t.extractCentroidMeasurements()
 
@@ -370,13 +421,12 @@ class WormTrajectoryEnsemble:
         bins = np.linspace(0, 500, 200)
         p, pl, pu = self.ensembleAverage(lambda x: x.getSpeedDistribution(bins)[0])
         centers = [(x1+x2)/2 for x1, x2 in pairwise(bins)]
-        plt.plot(centers, p, '.-', color=color)
+        plt.plot(centers, p, '.-', color=color, label=self.name)
         plt.hold(True)
         plt.fill_between(centers, pl, pu, facecolor=color, alpha=0.3)
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.xlim([0,max(bins)])
-        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
         if showPlot:
             plt.show()
 
@@ -393,7 +443,6 @@ class WormTrajectoryEnsemble:
         plt.ylabel('Probability')
         plt.xlim([0, max(bins)])
         plt.legend()
-        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
         if showPlot:
             plt.show()
 
@@ -402,11 +451,10 @@ class WormTrajectoryEnsemble:
         n = np.round(maxT*self[0].frameRate)
         tau = range(n)/self[0].frameRate
         C, Cl, Cu = self.ensembleAverage(lambda x: x.getSpeedAutocorrelation(maxT)[1])
-        plt.semilogx(tau, C, '.-', color=color)
+        plt.semilogx(tau, C, '.-', color=color, label=self.name)
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
         plt.xlabel(r'$\log \tau / (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
-        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
         # TODO: smart xlim
         if showPlot:
             plt.show()
@@ -415,11 +463,94 @@ class WormTrajectoryEnsemble:
         tau = np.logspace(-1,3,200)
         S, Sl, Su = self.ensembleAverage(lambda x: x.getMeanSquaredDisplacement(tau)[1])
         log_tau = np.log10(tau)
-        plt.plot(log_tau, S, '.-', color=color)
+        plt.plot(log_tau, S, '.-', color=color, label=self.name)
         plt.hold(True)
         plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
-        plt.gca().grid(color=[0.5,0.5,0.5], linestyle=':', linewidth=0.5)
+        if showPlot:
+            plt.show()
+
+
+class WormTrajectoryEnsembleGroup(object):
+    def __init__(self, ensembles, name=None, colorScheme=None):
+        if any(not isinstance(it, WormTrajectoryEnsemble)
+               for it in ensembles):
+            raise TypeError('A trajectory ensemble group must contain ' +
+                            'WormTrajectoryEnsemble objects.')
+        self._ensembles = list(ensembles)
+        self.name = name
+        if colorScheme is None:
+            self.colorScheme = {ens: 'k' for ens in ensembles}
+        else:
+            self.colorScheme = colorScheme
+
+    def __iter__(self):
+        for ens in self._ensembles:
+            yield ens
+
+    def __getitem__(self, key):
+        return self._ensembles[key]
+
+    def __setitem__(self, key, value):
+        self._ensembles[key] = value
+
+    def __delitem__(self, key):
+        del self._ensembles
+
+    def __contains__(self, value):
+        return value in self._ensembles
+
+    def __len__(self):
+        return len(self._ensembles)
+
+    def __getslice__(self, i, j):
+        return WormTrajectoryEnsembleGroup(self._ensembles[i:j],
+                                           name=self.name+' Slice')
+
+    def __setslice__(self, i, j, sequence):
+        self._ensembles[i:j] = sequence
+
+    def __delslice__(self, i, j):
+        del self._ensembles[i:j]
+
+    def sort(self, cmp=None, key=None):
+        if cmp is None and key is None:
+            key = lambda e: e.name
+        self._ensembles.sort(cmp=cmp, key=key)
+
+    def plotSpeedDistribution(self, showPlot=True):
+        plt.figure()
+        for ens in self:
+            color = (self.colorScheme[ens]
+                     if ens in self.colorScheme
+                     else 'k')
+            ens.plotSpeedDistribution(color=color,
+                                      showPlot=False)
+        plt.legend()
+        if showPlot:
+            plt.show()
+
+    def plotSpeedAutocorrelation(self, showPlot=True):
+        plt.figure()
+        for ens in self:
+            color = (self.colorScheme[ens]
+                     if ens in self.colorScheme
+                     else 'k')
+            ens.plotSpeedAutocorrelation(color=color,
+                                         showPlot=False)
+        plt.legend()
+        if showPlot:
+            plt.show()
+
+    def plotMeanSquaredDisplacement(self, showPlot=True):
+        plt.figure()
+        for ens in self:
+            color = (self.colorScheme[ens]
+                     if ens in self.colorScheme
+                     else 'k')
+            ens.plotMeanSquaredDisplacement(color=color,
+                                            showPlot=False)
+        plt.legend()
         if showPlot:
             plt.show()
