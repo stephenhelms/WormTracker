@@ -324,9 +324,9 @@ class WormVideoRegion:
             # loop through video frames
             success, frame = video.read()
             while success:
-                framev = cv2.split(frame)  # split the channels
+                framev = np.squeeze(frame[:, :, 0])  # split the channels
                 tStart = time.clock()
-                self.processFrame(framev[0], ii)
+                self.processFrame(framev, ii)
                 tStop = time.clock()
                 tDuration = (tStop - tStart)
                 print 'Processing frame {0} of {1} took {2} s.'.format(
