@@ -82,3 +82,7 @@ def cleanUpPostProcess(wormVideo):
     except(Exception) as e:
         print 'Error cleaning up:'
         print e
+
+
+if __name__ == '__main__':
+    multiprocessing.freeze_support()

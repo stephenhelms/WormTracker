@@ -853,3 +853,7 @@ class WormImage:
             m = self.toCroppedCoordinates(self.midpoint)
             plt.plot(m[1], m[0], 's', ms=12,
                      color=self.midpointColor)
+
+
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
