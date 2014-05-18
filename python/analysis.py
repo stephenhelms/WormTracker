@@ -107,27 +107,6 @@ class WormTrajectory:
         # width
         return ip
 
-    def identifyBadFrames(self):
-        lengths = self.h5ref['length'][...]
-        widths = self.h5ref['width'][...]
-        
-        badFrames = np.logical_or(lengths == 0,
-        	                      widths == 0)
-        
-        self.length = np.median(lengths[np.logical_not(badFrames)])
-        self.width = np.median(widths[np.logical_not(badFrames)])
-        if self.filterByWidth:
-            badFrames = np.logical_or(badFrames,
-                np.logical_or(np.logical_or(lengths < 0.8*self.length,
-                                            lengths > 1.2*self.length),
-                              np.logical_or(widths < 0.5*self.width,
-                                            widths > 1.5*self.width)))
-        else:
-            badFrames = np.logical_or(badFrames,
-                np.logical_or(lengths < 0.8*self.length,
-                              lengths > 1.2*self.length))
-        self.badFrames = badFrames
-
     def excludeBadFrames(self):
         self.X[self.badFrames, :] = ma.masked
         self.v[self.badFrames, :] = ma.masked
@@ -140,109 +119,6 @@ class WormTrajectory:
         self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
         self.phi = np.arctan2(self.v[:, 1], self.v[:, 0])
         self.excludeBadFrames()
-
-    def extractPosturalData(self):
-        # import skeleton splines
-        skeletons = [None] * self.maxFrameNumber
-        for frame in self.frames:
-            n = int(frame.name.split('/')[-1])
-            # check bad frame
-            if frame['length'] > 0 and not self.badFrames[n]:
-                skeletons[n] = frame['skeletonSpline'][...]
-
-        self.haveSkeleton = [(skeleton is not None) for skeleton in skeletons]
-
-    def fixPosturalOrdering(self, skeletons):
-        # compare possible skeleton orientations
-        interframe_d = np.empty((self.maxFrameNumber, 2)) * np.NaN
-        flipped = np.zeros((self.maxFrameNumber,), dtype=bool)
-        nFromLastGood = np.empty((self.maxFrameNumber,)) * np.NaN
-
-        def skeletonDist(skeleton1, skeleton2):
-            distEachPoint = np.sqrt(np.sum(np.power(skeleton1 -
-                                                    skeleton2, 2),
-                                           axis=1))
-            # return average distance per spline point
-            return np.sum(distEachPoint)/skeleton1.shape[0]
-
-        for i in xrange(1, self.maxFrameNumber):
-            # check whether there is a previous skeleton to compare
-            if not self.haveSkeleton[i] or not np.any(self.haveSkeleton[:i]):
-                continue
-
-            ip = np.where(self.haveSkeleton[:i])[0][-1]  # last skeleton
-            nFromLastGood[i] = i - ip
-            interframe_d[i, 0] = skeletonDist(skeletons[i], skeletons[ip])
-            # flipped orientation
-            interframe_d[i, 1] = skeletonDist(np.flipud(skeletons[i]),
-                                              skeletons[ip])
-            if interframe_d[i, 1] < interframe_d[i, 0]:
-                # if the flipped orientation is better, flip the data
-                flipped[i] = not flipped[ip]
-            else:
-                flipped[i] = flipped[ip]
-        
-        # flip data appropriately
-        # this code needs to be tested
-        nAngles = max(len(skeleton) for skeleton in skeletons
-        	          if skeleton is not None)
-        self.skeleton = ma.zeros((self.maxFrameNumber, nAngles, 2))
-        sel = self.haveSkeleton and not flipped
-        self.skeleton[sel, :, :] = np.array(skeletons[sel])
-        sel = self.haveSkeleton and flipped
-        self.skeleton[sel, :, :] = np.array(np.flipud(skeletons[sel]))
-        self.skeleton[not self.haveSkeleton, :, :] = ma.masked
-
-        self.theta = ma.zeros((self.maxFrameNumber, nAngles))
-        for frame in self.frames:
-            n = int(frame.name.split('/')[-1])
-            # check bad frame
-            if self.haveSkeleton[n]:
-            	if not flipped[n]:
-                    self.theta[n,:] = frame['theta'][...]
-                else:
-                	self.theta[n,:] = np.flipud(frame['theta'][...])
-        self.theta[not self.haveSkeleton, :] = ma.masked
-
-    def segment(self):
-        # break video into segments with matched skeletons
-        max_n_missing = 10
-        max_d = 10/self.pixelsPerMicron
-        max_segment_frames = 500
-        min_segment_size = 150
-
-        ii = 0
-        segments = []
-        while ii < self.maxFrameNumber:
-            begin = ii
-            ii+=1
-            # Continue segment until >max_n_missing consecutive bad frames
-            # are found, or >max_segment_frames are collected
-            n_missing = 0
-            last_missing = False
-            while (ii < self.maxFrameNumber and
-                   ii - begin < max_segment_frames and
-                   (interframe_d[ii, 0] == np.NaN or
-                   	np.min(interframe_d[ii, :])<max_d)):
-                if not haveSkeleton[ii]:
-                	n_missing+=1
-                	last_missing = True
-                	if n_missing > max_n_missing:
-                		ii+=1
-                		break
-                else:
-                	n_missing = 0
-                	last_missing = False
-                ii+=1
-            segments.append([begin, ii])
-
-        self.segments = [segment for segment in segments
-                         if np.sum(haveSkeleton[segment[0]:segment[1]]) >
-                         min_segment_size]
-
-    def assignHeadTail(self):
-        # add head assignment algorithm
-        raise NotImplemented()
 
     def plotTrajectory(self, color='k', showFrame=True, showPlot=True):
         if showFrame and self.firstFrame is not None:
