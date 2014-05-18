@@ -31,8 +31,8 @@ class WormTrajectoryPostProcessor:
         self.h5ref = h5obj['worms'][strain][name]
         self.lengths = self.h5ref['length'][...]
         self.widths = self.h5ref['width'][...]
-        self.frameRate = h5obj['/video/frameRate'][...]
-        self.pixelsPerMicron = h5obj['/video/pixelsPerMicron'][...]
+        self.frameRate = h5obj['/video/frameRate'][0]
+        self.pixelsPerMicron = h5obj['/video/pixelsPerMicron'][0]
         self.maxFrameNumber = self.h5ref['time'].shape[0]
         self.nAngles = self.h5ref['posture'].shape[1]
         self.badFrames = np.zeros((self.maxFrameNumber,), dtype='bool')
@@ -48,6 +48,7 @@ class WormTrajectoryPostProcessor:
         self.fixPosturalOrdering()
         self.segment()
         self.assignHeadTail()
+        self.orderHeadTail()
 
     def identifyBadFrames(self):
         badFrames = np.logical_or(self.lengths == 0,
@@ -210,12 +211,13 @@ class WormTrajectoryPostProcessor:
                         np.fliplr(self.skeleton[b:e, :, :])
                     self.posture[b:e, :] = \
                         np.fliplr(self.posture[b:e, :])
+        self.orientationFixed = orientationFixed
 
     def store(self):
         if 'segments' not in self.h5ref:
                 self.h5ref.create_dataset('segments',
                                           (len(self.segments), 2),
-                                          maxShape=(self.maxFrameNumber, 2),
+                                          maxshape=(self.maxFrameNumber, 2),
                                           chunks=True,
                                           dtype='int')
         if len(self.segments) > self.h5ref['segments'].shape[0]:
@@ -227,7 +229,7 @@ class WormTrajectoryPostProcessor:
         if 'segmentAssignMethod' not in self.h5ref:
                 self.h5ref.create_dataset('segmentAssignMethod',
                                           (len(self.segments),),
-                                          maxShape=(self.maxFrameNumber,),
+                                          maxshape=(self.maxFrameNumber,),
                                           chunks=True,
                                           dtype='int')
         if len(self.segments) > self.h5ref['segmentAssignMethod'].shape[0]:
