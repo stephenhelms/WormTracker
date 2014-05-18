@@ -329,7 +329,7 @@ class WormVideoRegion:
                 self.processFrame(framev, ii)
                 tStop = time.clock()
                 tDuration = (tStop - tStart)
-                print 'Processing frame {0} of {1} took {2} s.'.format(
+                print '\rProcessing frame {0} of {1} took {2} s.'.format(
                     str(ii+1), str(self.nFrames), str(tDuration)),
                 # read next video frame
                 success, frame = video.read()
