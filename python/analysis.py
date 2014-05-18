@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import numpy.ma as ma
+from numpy import linalg as LA
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import h5py
@@ -53,23 +54,28 @@ class WormTrajectory:
         self.t = self.h5ref['time'][...]
         self.maxFrameNumber = self.t.shape[0]
         self.X = ma.array(self.h5ref['centroid'][...] / self.pixelsPerMicron)
+        self.Xhead = ma.zeros(self.X.shape)
         self.v = ma.zeros(self.X.shape)
         self.s = ma.zeros((self.maxFrameNumber,))
         self.phi = ma.zeros((self.maxFrameNumber,))
         self.length = np.NaN
         self.width = np.NaN
-        self.badFrames = np.zeros((self.maxFrameNumber,), dtype='bool')
+        if 'badFrames' in self.h5ref:
+            self.badFrames = self.h5ref['badFrames'][...]
+        else:
+            self.badFrames = np.zeros((self.maxFrameNumber,), dtype='bool')
         if videoFilePath is not None:
             videoFile = h5obj['/video/videoFile'][0]
             self.videoFile = os.path.join(videoFilePath, videoFile)
         else:
             self.videoFile = None
 
-        #self.psiEnds = np.empty((self.maxFrameNumber,2)) * np.NaN
-        #self.psi = np.empty((self.maxFrameNumber,)) * np.NaN
-        #self.dpsi = np.empty((self.maxFrameNumber,)) * np.NaN
-        #self.state = np.empty((self.maxFrameNumber,)) * np.NaN
-        #self.theta = np.empty((self.maxFrameNumber,self.numberAngles)) * np.NaN
+        self.skeleton = ma.array(self.h5ref['skeletonSpline'][...])
+        self.posture = ma.array(self.h5ref['posture'][...])
+        if 'orientationFixed' in self.h5ref:
+            self.orientationFixed = self.h5ref['orientationFixed'][...]
+        else:
+            self.orientationFixed = ma.zeros((self.maxFrameNumber,), dtype='bool')
 
     def readFirstFrame(self):
         if self.videoFile is None:
@@ -112,13 +118,31 @@ class WormTrajectory:
         self.v[self.badFrames, :] = ma.masked
         self.s[self.badFrames] = ma.masked
         self.phi[self.badFrames] = ma.masked
+        self.skeleton[np.logical_not(self.orientationFixed), :, :] = ma.masked
+        self.psi[np.logical_not(self.orientationFixed)] = ma.masked
+        self.dpsi[np.logical_or(np.logical_not(self.orientationFixed),
+                                self.badFrames)] = ma.masked
+        self.posture[np.logical_not(self.orientationFixed), :] = ma.masked
 
-    def extractCentroidMeasurements(self):
+    def extractMeasurements(self):
         self.X[self.badFrames, :] = ma.masked
         self.v[1:-1] = (self.X[2:, :] - self.X[0:-2])/(2.0/self.frameRate)
         self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
         self.phi = np.arctan2(self.v[:, 1], self.v[:, 0])
+        self.Xhead = np.squeeze(self.skeleton[:, 0, :])
+        self.Xhead = ((self.Xhead + self.h5ref['boundingBox'][:, :2]) /
+                      self.pixelsPerMicron)
+        self.Xhead[np.logical_not(self.orientationFixed), :] = ma.masked
+        self.psi = np.arctan2(self.Xhead[:, 1]-self.X[:, 1],
+                              self.Xhead[:, 0]-self.X[:, 0])
+        self.dpsi = self.phi - self.psi
         self.excludeBadFrames()
+
+    def calculatePosturalMeasurements(self):
+        missing = np.any(self.posture.mask, axis=1)
+        posture = self.posture[~missing, :].T
+        self.C_posture = np.cov(posture)
+        self.l_posture, self.v_posture = LA.eig(self.C_posture)
 
     def plotTrajectory(self, color='k', showFrame=True, showPlot=True):
         if showFrame and self.firstFrame is not None:
@@ -208,6 +232,48 @@ class WormTrajectory:
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
         plt.show()
+
+    def plotPosturalCovariance(self, showPlot=True):
+        plt.imshow(self.C_posture, plt.get_cmap('PuOr'))
+        plt.clim((-0.3,0.3))
+        plt.colorbar()
+        if showPlot:
+            plt.show()
+
+    def plotPosturalModeDistribution(self, color='k', showPlot=True):
+        plt.plot(self.l_posture/np.sum(self.l_posture), '.-', color=color,
+                 label='{0} {1}'.format(self.strain, self.wormID))
+        plt.xlabel('Postural Mode')
+        plt.ylabel('%% Variance')
+        plt.ylim((0, 1))
+        if showPlot:
+            plt.show()
+
+    def plotPosturalTimeSeries(self, postureVec, color='k', showPlot=True):
+        if isinstance(postureVec, int):
+            postureVec = self.v_posture[:, postureVec]
+        A = np.dot(self.posture, postureVec)
+        missing = np.any(self.posture.mask, axis=1)
+        A[missing] = ma.masked
+        plt.plot(self.t, A, '.', color=color,
+                 label='{0} {1}'.format(self.strain, self.wormID))
+        if showPlot:
+            plt.show()
+
+    def plotPosturalPhaseSpace(self, postureVec1, postureVec2, color='k',
+                               showPlot=True):
+        if isinstance(postureVec1, int):
+            postureVec1 = self.v_posture[:, postureVec1]
+        missing = np.any(self.posture.mask, axis=1)
+        A = np.dot(self.posture, postureVec1)
+        A[missing] = ma.masked
+        if isinstance(postureVec2, int):
+            postureVec2 = self.v_posture[:, postureVec2]
+        B = np.dot(self.posture, postureVec2)
+        B[missing] = ma.masked
+        plt.scatter(A, B, marker='.', c=color, s=5)
+        if showPlot:
+            plt.show()
 
 
 def bootstrap(array, nSamples=1000):
