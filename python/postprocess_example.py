@@ -1,43 +1,19 @@
 import h5py
-import wormtracker as wt
-import analysis
+import os
+os.chdir('D:\\Stephen\\Documents\\Code\\wormtracker-matlab\\python')
+import wormtracker.postprocess as pp
+
 
 # configuration
-videoPath = 'U:\\Koers\\worm_videos\\day_7'
 results = 'D:\\2014-04-14_n2_a_b_day_7_processed.h5'
-f = h5py.File(results, 'r')
+f = h5py.File(results, 'r+')  # warning: read-write permission!
 
-# make trajectory ensemble
-ens = analysis.WormTrajectoryEnsemble([analysis.WormTrajectory(f, 'N2', str(i+1),
-                                       videoFilePath=videoPath) for i in xrange(16)],
-                                      'N2 Day 7')
-ens.processAll()  # grabs data from the store file
-ens.sort()  # sort by name
-
-# show all trajectories
-ens.tilePlots(lambda t: t.plotTrajectory(showPlot=False))
-# show all speed time series
-ens.tilePlots(lambda t: t.plotSpeed(showPlot=False))
-# show ensemble speed distribution
-ens.plotSpeedDistribution()
-# show ensemble MSD
-ens.plotMeanSquaredDisplacement()
-
-# make a group
-ens1 = ens[:8]
-ens1.name = 'first'
-ens2 = ens[8:]
-ens2.name = 'second'
-ensg = analysis.WormTrajectoryEnsembleGroup([ens1, ens2],
-                                            name='Test Comparison',
-                                            colorScheme={ens1: 'b',
-                                                         ens2: 'r'})
-
-# compare speed distributions
-ensg.plotSpeedDistribution()
-# compare speed ACFs
-ensg.plotSpeedAutocorrelation()
-# compare MSDs
-ensg.plotMeanSquaredDisplacement()
+# postprocess all trajectories
+for strain in f['worms'].keys():
+	for wormID in f['worms'][strain].keys():
+		print 'Post-processing {0} {1}'.format(strain, wormID)
+		wtpp = pp.WormTrajectoryPostProcessor(f, strain, wormID)
+		wtpp.postProcess()  # this can take a while...
+		wtpp.store()  # store results
 
 f.close()

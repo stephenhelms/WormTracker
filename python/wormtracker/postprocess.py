@@ -43,11 +43,17 @@ class WormTrajectoryPostProcessor:
         self.width = None
 
     def postProcess(self):
+        print 'Identifying bad frames...'
         self.identifyBadFrames()
+        print 'Extracting postural data...'
         self.extractPosturalData()
+        print 'Fixing order of postural data...'
         self.fixPosturalOrdering()
+        print 'Segmenting trajectory...'
         self.segment()
+        print 'Assigning head...'
         self.assignHeadTail()
+        print 'Ordering postural data head to tail...'
         self.orderHeadTail()
 
     def identifyBadFrames(self):

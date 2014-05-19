@@ -21,6 +21,27 @@ def configureMatplotLibStyle():
     mpl.rcParams['legend.frameon'] = False
 
 
+def bootstrap(array, nSamples=1000):
+    nObserv, nVar = array.shape
+    mu = np.zeros((nSamples, nVar))
+    replaceIdx = np.random.randint(nObserv, size=(nSamples, 2))
+    for i, (iold, inew) in enumerate(replaceIdx):
+        resampled = array.copy()
+        resampled[iold, :] = resampled[inew, :]
+        mu[i, :] = np.mean(resampled, axis=0)
+
+    return (np.mean(mu, axis=0),
+            np.percentile(mu, 2.5, axis=0),
+            np.percentile(mu, 97.5, axis=0))
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)
+
+
 def acf(x, lags=500):
     # from stackexchange
     x = x - np.mean(x)  # remove mean
@@ -276,27 +297,6 @@ class WormTrajectory:
             plt.show()
 
 
-def bootstrap(array, nSamples=1000):
-    nObserv, nVar = array.shape
-    mu = np.zeros((nSamples, nVar))
-    replaceIdx = np.random.randint(nObserv, size=(nSamples, 2))
-    for i, (iold, inew) in enumerate(replaceIdx):
-        resampled = array.copy()
-        resampled[iold, :] = resampled[inew, :]
-        mu[i, :] = np.mean(resampled, axis=0)
-
-    return (np.mean(mu, axis=0),
-            np.percentile(mu, 2.5, axis=0),
-            np.percentile(mu, 97.5, axis=0))
-
-
-def pairwise(iterable):
-    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
-    a, b = itertools.tee(iterable)
-    next(b, None)
-    return itertools.izip(a, b)
-
-
 class WormTrajectoryEnsemble:
     def __init__(self, trajectoryIter=None, name=None, nameFunc=None):
         if any(not isinstance(it, WormTrajectory) for it in trajectoryIter):
@@ -344,8 +344,8 @@ class WormTrajectoryEnsemble:
     def processAll(self):
         for t in self:
             t.readFirstFrame()
-            t.identifyBadFrames()
-            t.extractCentroidMeasurements()
+            t.extractMeasurements()
+            t.calculatePosturalMeasurements()
 
     def ensembleAverage(self, compFunc, nSamples=1000):
         samples = np.array([compFunc(traj) for traj in self])
