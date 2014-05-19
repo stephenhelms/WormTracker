@@ -62,6 +62,8 @@ def dotacf(x, lags=500):
 class WormTrajectory:
     filterByWidth = False
     firstFrame = None
+    allCentroidMissing = False
+    allPostureMissing = False
     attr = {}
 
     def __init__(self, h5obj, strain, wormID, videoFilePath=None):
@@ -83,6 +85,7 @@ class WormTrajectory:
         self.width = np.NaN
         if 'badFrames' in self.h5ref:
             self.badFrames = self.h5ref['badFrames'][...]
+            self.allCentroidMissing = np.all(self.badFrames)
         else:
             self.badFrames = np.zeros((self.maxFrameNumber,), dtype='bool')
         if videoFilePath is not None:
@@ -95,6 +98,7 @@ class WormTrajectory:
         self.posture = ma.array(self.h5ref['posture'][...])
         if 'orientationFixed' in self.h5ref:
             self.orientationFixed = self.h5ref['orientationFixed'][...]
+            self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
         else:
             self.orientationFixed = ma.zeros((self.maxFrameNumber,), dtype='bool')
 
@@ -135,6 +139,7 @@ class WormTrajectory:
         return ip
 
     def excludeBadFrames(self):
+        self.t[self.badFrames] = ma.masked
         self.X[self.badFrames, :] = ma.masked
         self.v[self.badFrames, :] = ma.masked
         self.s[self.badFrames] = ma.masked
@@ -161,9 +166,14 @@ class WormTrajectory:
 
     def calculatePosturalMeasurements(self):
         missing = np.any(self.posture.mask, axis=1)
-        posture = self.posture[~missing, :].T
-        self.C_posture = np.cov(posture)
-        self.l_posture, self.v_posture = LA.eig(self.C_posture)
+        if np.all(missing):
+            self.C_posture = None
+            self.l_posture = None
+            self.v_posture = None
+        else:
+            posture = self.posture[~missing, :].T
+            self.C_posture = np.cov(posture)
+            self.l_posture, self.v_posture = LA.eig(self.C_posture)
 
     def plotTrajectory(self, color='k', showFrame=True, showPlot=True):
         if showFrame and self.firstFrame is not None:
@@ -255,6 +265,8 @@ class WormTrajectory:
         plt.show()
 
     def plotPosturalCovariance(self, showPlot=True):
+        if self.C_posture is None:
+            return
         plt.imshow(self.C_posture, plt.get_cmap('PuOr'))
         plt.clim((-0.3,0.3))
         plt.colorbar()
@@ -262,6 +274,8 @@ class WormTrajectory:
             plt.show()
 
     def plotPosturalModeDistribution(self, color='k', showPlot=True):
+        if self.C_posture is None:
+            return
         plt.plot(self.l_posture/np.sum(self.l_posture), '.-', color=color,
                  label='{0} {1}'.format(self.strain, self.wormID))
         plt.xlabel('Postural Mode')
@@ -271,6 +285,8 @@ class WormTrajectory:
             plt.show()
 
     def plotPosturalTimeSeries(self, postureVec, color='k', showPlot=True):
+        if self.C_posture is None:
+            return
         if isinstance(postureVec, int):
             postureVec = self.v_posture[:, postureVec]
         A = np.dot(self.posture, postureVec)
@@ -283,6 +299,8 @@ class WormTrajectory:
 
     def plotPosturalPhaseSpace(self, postureVec1, postureVec2, color='k',
                                showPlot=True):
+        if self.C_posture is None:
+            return
         if isinstance(postureVec1, int):
             postureVec1 = self.v_posture[:, postureVec1]
         missing = np.any(self.posture.mask, axis=1)
@@ -351,10 +369,10 @@ class WormTrajectoryEnsemble:
         samples = np.array([compFunc(traj) for traj in self])
         return bootstrap(samples, nSamples)
 
-    def tilePlots(self, plotFunc):
+    def tilePlots(self, plotFunc, ni=4, nj=4):
         plt.figure()
         for i, t in enumerate(self):
-            plt.subplot(4, np.ceil(len(self)/4), i+1)
+            plt.subplot(ni, nj, i+1)
             plotFunc(t)
             plt.title(self.nameFunc(t))
         plt.show()
