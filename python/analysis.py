@@ -8,6 +8,7 @@ import h5py
 import itertools
 import cv2
 import wormimageprocessor as wip
+import multiprocessing as multi
 
 
 def configureMatplotLibStyle():
@@ -101,6 +102,11 @@ class WormTrajectory:
             self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
         else:
             self.orientationFixed = ma.zeros((self.maxFrameNumber,), dtype='bool')
+
+    def process(self):
+        self.readFirstFrame()
+        self.extractMeasurements()
+        self.calculatePosturalMeasurements()
 
     def readFirstFrame(self):
         if self.videoFile is None:
@@ -314,6 +320,23 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
+    def plotPosturalPhaseSpaceDensity(self, postureVec1, postureVec2,
+                               showPlot=True):
+        if self.C_posture is None:
+            return
+        if isinstance(postureVec1, int):
+            postureVec1 = self.v_posture[:, postureVec1]
+        missing = np.any(self.posture.mask, axis=1)
+        A = np.dot(self.posture, postureVec1)
+        A[missing] = ma.masked
+        if isinstance(postureVec2, int):
+            postureVec2 = self.v_posture[:, postureVec2]
+        B = np.dot(self.posture, postureVec2)
+        B[missing] = ma.masked
+        plt.hexbin(A, B)
+        if showPlot:
+            plt.show()
+
 
 class WormTrajectoryEnsemble:
     def __init__(self, trajectoryIter=None, name=None, nameFunc=None):
@@ -388,9 +411,34 @@ class WormTrajectoryEnsemble:
 
     def processAll(self):
         for t in self:
-            t.readFirstFrame()
-            t.extractMeasurements()
-            t.calculatePosturalMeasurements()
+            t.process()
+
+    def processAllParallel(self):
+        # Buggy?
+        pool = multi.Pool()
+        print 'Processing trajectories in parallel...'
+        result = pool.map_async(lambda t: t.process(), self)
+        result.get()
+        print 'Done processing.'
+        pool.join()
+        pool.close()
+
+    def calculatePosturalMeasurements(self):
+        posture = []
+        for traj in self:
+            missing = np.any(traj.posture.mask, axis=1)
+            if np.all(missing):
+                continue
+            else:
+                posture.append(traj.posture[~missing, :])   
+        if len(posture) > 0:
+            posture = np.concatenate(posture).T
+            self.C_posture = np.cov(posture)
+            self.l_posture, self.v_posture = LA.eig(self.C_posture)
+        else:
+            self.C_posture = None
+            self.l_posture = None
+            self.v_posture = None
 
     def ensembleAverage(self, compFunc, nSamples=1000):
         samples = np.array([compFunc(traj) for traj in self])
@@ -455,6 +503,49 @@ class WormTrajectoryEnsemble:
         plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+        if showPlot:
+            plt.show()
+
+    def plotPosturalCovariance(self, showPlot=True):
+        if self.C_posture is None:
+            return
+        plt.imshow(self.C_posture, plt.get_cmap('PuOr'))
+        plt.clim((-0.3,0.3))
+        plt.colorbar()
+        if showPlot:
+            plt.show()
+
+    def plotPosturalModeDistribution(self, color='k', showPlot=True):
+        if self.C_posture is None:
+            return
+        plt.plot(self.l_posture/np.sum(self.l_posture), '.-', color=color)
+        plt.xlabel('Postural Mode')
+        plt.ylabel('%% Variance')
+        plt.ylim((0, 1))
+        if showPlot:
+            plt.show()
+
+    def plotPosturalPhaseSpaceDensity(self, postureVec1, postureVec2,
+                               showPlot=True):
+        if self.C_posture is None:
+            return
+        if isinstance(postureVec1, int):
+            postureVec1 = self.v_posture[:, postureVec1]
+        if isinstance(postureVec2, int):
+                postureVec2 = self.v_posture[:, postureVec2]
+        A = []
+        B = []
+        for traj in self:
+            if traj.C_posture is None:
+                continue
+            missing = np.any(traj.posture.mask, axis=1)
+            a = np.dot(traj.posture, postureVec1)
+            a[missing] = ma.masked
+            A.append(a)
+            b = np.dot(traj.posture, postureVec2)
+            b[missing] = ma.masked
+            B.append(b)
+        plt.hexbin(np.concatenate(A), np.concatenate(B), bins='log')
         if showPlot:
             plt.show()
 
