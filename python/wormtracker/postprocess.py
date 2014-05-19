@@ -259,7 +259,6 @@ class WormTrajectoryPostProcessor:
         self.h5ref['posture'][...] = self.posture
 
 
-@jit
 def _getMotionVariables(X, dt):
     v = ma.zeros(X.shape)
     v[0] = ma.masked
