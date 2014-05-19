@@ -330,6 +330,9 @@ class WormTrajectoryEnsemble:
         for traj in self._trajectories:
             yield traj
 
+    #  TODO: Implement
+    #  __add__(), __radd__(), __iadd__(), __mul__(), __rmul__() and __imul__()
+
     def __getitem__(self, key):
         return self._trajectories[key]
 
@@ -353,6 +356,30 @@ class WormTrajectoryEnsemble:
 
     def __delslice__(self, i, j):
         del self._trajectories[i:j]
+
+    def append(self, item):
+        self._trajectories.append(item)
+
+    def count(self):
+        return self._trajectories.count()
+
+    def index(self, value):
+        return self._trajectories.index(value)
+
+    def extend(self, iter):
+        self._trajectories.extend(iter)
+
+    def insert(self, index, item):
+        self._trajectories.insert(index, item)
+
+    def pop(self, index):
+        self._trajectories.pop([index])
+
+    def remove(self, item):
+        self._trajectories.remove(item)
+
+    def reverse(self):
+        self._trajectories.reverse()
 
     def sort(self, cmp=None, key=None):
         if cmp is None and key is None:
@@ -449,6 +476,9 @@ class WormTrajectoryEnsembleGroup(object):
         for ens in self._ensembles:
             yield ens
 
+    #  TODO: Implement
+    #  __add__(), __radd__(), __iadd__(), __mul__(), __rmul__() and __imul__()
+
     def __getitem__(self, key):
         return self._ensembles[key]
 
@@ -473,6 +503,30 @@ class WormTrajectoryEnsembleGroup(object):
 
     def __delslice__(self, i, j):
         del self._ensembles[i:j]
+
+    def append(self, item):
+        self._ensembles.append(item)
+
+    def count(self):
+        return self._ensembles.count()
+
+    def index(self, value):
+        return self._ensembles.index(value)
+
+    def extend(self, iter):
+        self._ensembles.extend(iter)
+
+    def insert(self, index, item):
+        self._ensembles.insert(index, item)
+
+    def pop(self, index):
+        self._ensembles.pop([index])
+
+    def remove(self, item):
+        self._ensembles.remove(item)
+
+    def reverse(self):
+        self._ensembles.reverse()
 
     def sort(self, cmp=None, key=None):
         if cmp is None and key is None:
