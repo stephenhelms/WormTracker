@@ -222,10 +222,15 @@ class WormVideo:
             if len(possibleWorms) > 0:
                 likelyWorm = max(possibleWorms, key=lambda worm: worm[1])
                 if likelyWorm is not None:
-                    wormImage = WormImage(region, filtered, cleaned,
-                                          likelyWorm[0])
-                    wormImage.measureWorm()
-                    wormImage.plot(bodyPtMarkerSize=30)
+                    try:
+                        wormImage = WormImage(region, filtered, cleaned,
+                                              likelyWorm[0])
+                        wormImage.measureWorm()
+                        wormImage.plot(bodyPtMarkerSize=30)
+                    except(Exception) as e:
+                        print 'Error in {0} {1}: {2}'.format(region.strainName,
+                                                             region.wormName,
+                                                             str(e))
             plt.title(region.strainName + ' ' + region.wormName)
         plt.show()
 
@@ -371,16 +376,20 @@ class WormVideoRegion:
         if likelyWorm is not None:
             # Create worm object which will measure
             # the properties of the worm
-            worm = self.measureWorm(fFrame,
-                                    clFrame,
-                                    likelyWorm[0])
+            try:
+                worm = self.measureWorm(fFrame,
+                                        clFrame,
+                                        likelyWorm[0])
 
-            # write results to HDF5 store
-            pre = (self.resultsStorePath + '/' +
-                   self.strainName + '/' +
-                   self.wormName)
-            worm.store(self.resultsStoreFile,
-                       pre, idx)
+                # write results to HDF5 store
+                pre = (self.resultsStorePath + '/' +
+                       self.strainName + '/' +
+                       self.wormName)
+                worm.store(self.resultsStoreFile,
+                           pre, idx)
+            except(Exception) as e:
+                print 'Error in {0} {1} frame {2} analyzing worm.'.format(
+                    self.strainName, self.wormName, str(idx))
 
     def measureWorm(self, grayFrame, bwFrame, wormContour):
         worm = WormImage(self, grayFrame, bwFrame, wormContour)
