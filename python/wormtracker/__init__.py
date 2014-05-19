@@ -17,12 +17,14 @@ import multiprocessing
 
 libavPath = 'C:\\libav\\bin\\'
 
+
 class WormVideo:
     imageProcessor = wp.WormImageProcessor()
     firstFrame = None
     pixelsPerMicron = None
     regions = []
     frameSize = None
+    nFrames = None
 
     def __init__(self, videoFile, storeFile='temp.h5',
                  videoInfoStorePath='/video',
@@ -37,7 +39,7 @@ class WormVideo:
         self.videoInfoStorePath = videoInfoStorePath
         self.resultsStorePath = resultsStorePath
 
-    def readFirstFrame(self):
+    def readFirstFrame(self, askForFrameRate=True):
         video = cv2.VideoCapture()
         if video.open(self.videoFile):
             success, firstFrame = video.read()
@@ -49,10 +51,11 @@ class WormVideo:
                 self.frameSize = self.firstFrame.shape
                 self.nFrames = int(video.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
                 print 'Video has ' + str(self.nFrames) + ' frames.'
-                frameRate = video.get(cv2.cv.CV_CAP_PROP_FPS)
-                print 'Video reports ' + str(frameRate) + ' fps.'
-                self.imageProcessor.frameRate = \
-                    float(raw_input('Enter correct frame rate:'))
+                if askForFrameRate:
+                    frameRate = video.get(cv2.cv.CV_CAP_PROP_FPS)
+                    print 'Video reports ' + str(frameRate) + ' fps.'
+                    self.imageProcessor.frameRate = \
+                        float(raw_input('Enter correct frame rate:'))
 
         else:
             raise Exception("Couldn't open video")
@@ -107,6 +110,11 @@ class WormVideo:
             region.videoFile = videoFile
             region.nFrames = self.nFrames
 
+    def updateStoreFile(self, storeFile):
+        self.storeFile = storeFile
+        for region in self.regions:
+            region.resultsStoreFile = storeFile
+
     def getNumberOfFrames(self):
         video = cv2.VideoCapture()
         if video.open(self.videoFile):
@@ -115,6 +123,8 @@ class WormVideo:
                 raise Exception("Couldn't read video")
             else:
                 self.nFrames = int(video.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+                for region in self.regions:
+                    region.nFrames = self.nFrames
 
     def addRegion(self, regionBounds, strain, name):
         """Adds the video region containing one worm.
@@ -131,6 +141,7 @@ class WormVideo:
                              wormName=name)
         wr.nFrames = self.nFrames
         self.regions.append(wr)
+        return wr
 
     def determinePixelSize(self):
         if self.firstFrame is None:
