@@ -9,11 +9,13 @@ import itertools
 import cv2
 import wormimageprocessor as wip
 import multiprocessing as multi
+from numba import jit
 
 
 def configureMatplotLibStyle():
     mpl.rcParams['font.family'] = 'sans-serif'
     mpl.rcParams['font.size'] = 8
+    mpl.rcParams['axes.grid'] = True
     mpl.rcParams['axes.labelsize'] = 'x-large'
     mpl.rcParams['axes.titlesize'] = 'x-large'
     mpl.rcParams['grid.color'] = (0.5, 0.5, 0.5)
@@ -56,7 +58,7 @@ def acf(x, lags=500):
 def dotacf(x, lags=500):
     if type(lags) is int:
         lags = xrange(lags)
-    return [np.mean(np.dot(x[l:, :], x[:l, :]), axis=0)
+    return [np.mean(np.vdot(x[l:, :], x[:-l, :]))
             for l in lags]
 
 
@@ -193,13 +195,14 @@ class WormTrajectory:
         plt.scatter(self.X[:, 0], self.X[:, 1], c=color, s=10)
         plt.hold(True)
         circle = plt.Circle(self.foodCircle[0:2], radius=self.foodCircle[-1],
-        	                color='r', fill=False)
+                            color='r', fill=False)
         plt.gca().add_patch(circle)
         plt.xlim((0, 10000))
         plt.ylim((0, 10000))
         plt.xlabel('x (um)')
         plt.xlabel('y (um)')
         plt.gca().set_aspect('equal')
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -207,6 +210,7 @@ class WormTrajectory:
         plt.plot(self.t, self.s, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Speed (um/s)')
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -214,6 +218,7 @@ class WormTrajectory:
         plt.plot(self.t, self.phi/np.pi, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Bearing ($\pi$ rad)')
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -232,6 +237,7 @@ class WormTrajectory:
         plt.hist(self.s.compressed(), bins, normed=True, facecolor=color)
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -241,16 +247,20 @@ class WormTrajectory:
         C = acf(self.s, n)
         return tau, C
 
-    def plotSpeedAutocorrelation(self, maxT=100):
-    	tau, C = self.getSpeedAutocorrelation(maxT)
-        plt.semilogx(tau, C, 'k-')
-    	plt.xlabel(r'$\log \tau / (s)$')
-    	plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+    def plotSpeedAutocorrelation(self, maxT=100, color='k', showPlot=True):
+        tau, C = self.getSpeedAutocorrelation(maxT)
+        plt.semilogx(tau, C, '-', color=color)
+        plt.xlabel(r'$\log \tau / (s)$')
+        plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.box('off')
+        if showPlot:
+            plt.show()
 
     def plotBearingAutocorrelation(self, maxT=100):
-    	n = np.round(maxT*self.frameRate)
-    	tau = range(n)/self.frameRate
+        n = np.round(maxT*self.frameRate)
+        tau = range(n)/self.frameRate
 
+    @jit
     def getMeanSquaredDisplacement(self, tau=None):
         if tau is None:
             tau = np.logspace(-1,3,200)
@@ -263,12 +273,14 @@ class WormTrajectory:
 
         return (tau, Sigma)
 
-    def plotMeanSquaredDisplacement(self, tau=None):
+    def plotMeanSquaredDisplacement(self, tau=None, showPlot=True):
         tau, Sigma = self.getMeanSquaredDisplacement(tau)
         plt.plot(np.log10(tau), Sigma, 'k.')
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
-        plt.show()
+        plt.box('off')
+        if showPlot:
+            plt.show()
 
     def plotPosturalCovariance(self, showPlot=True):
         if self.C_posture is None:
@@ -287,6 +299,7 @@ class WormTrajectory:
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
         plt.ylim((0, 1))
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -317,6 +330,7 @@ class WormTrajectory:
         B = np.dot(self.posture, postureVec2)
         B[missing] = ma.masked
         plt.scatter(A, B, marker='.', c=color, s=5)
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -334,6 +348,7 @@ class WormTrajectory:
         B = np.dot(self.posture, postureVec2)
         B[missing] = ma.masked
         plt.hexbin(A, B)
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -363,7 +378,7 @@ class WormTrajectoryEnsemble:
         self._trajectories[key] = value
 
     def __delitem__(self, key):
-        del self._trajectories
+        del self._trajectories[key]
 
     def __contains__(self, value):
         return value in self._trajectories
@@ -462,6 +477,7 @@ class WormTrajectoryEnsemble:
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.xlim([0,max(bins)])
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -477,6 +493,7 @@ class WormTrajectoryEnsemble:
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.xlim([0, max(bins)])
+        plt.box('off')
         plt.legend()
         if showPlot:
             plt.show()
@@ -490,6 +507,7 @@ class WormTrajectoryEnsemble:
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
         plt.xlabel(r'$\log \tau / (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.box('off')
         # TODO: smart xlim
         if showPlot:
             plt.show()
@@ -503,6 +521,7 @@ class WormTrajectoryEnsemble:
         plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -512,6 +531,7 @@ class WormTrajectoryEnsemble:
         plt.imshow(self.C_posture, plt.get_cmap('PuOr'))
         plt.clim((-0.3,0.3))
         plt.colorbar()
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -522,6 +542,20 @@ class WormTrajectoryEnsemble:
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
         plt.ylim((0, 1))
+        plt.box('off')
+        if showPlot:
+            plt.show()
+
+    def plotAveragePosturalModelDistribution(self, color='k', showPlot=True):
+        l, ll, lu = self.ensembleAverage(lambda x: x.l_posture / np.sum(x.l_posture))
+        plt.plot(l, '.-', color=color)
+        plt.hold(True)
+        plt.fill_between(xrange(l.shape[0]), ll, lu,
+                         facecolor=color, alpha=0.3)
+        plt.xlabel('Postural Mode')
+        plt.ylabel('%% Variance')
+        plt.ylim((0, 1))
+        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -577,7 +611,7 @@ class WormTrajectoryEnsembleGroup(object):
         self._ensembles[key] = value
 
     def __delitem__(self, key):
-        del self._ensembles
+        del self._ensembles[key]
 
     def __contains__(self, value):
         return value in self._ensembles
