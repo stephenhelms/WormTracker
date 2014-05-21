@@ -260,7 +260,6 @@ class WormTrajectory:
         n = np.round(maxT*self.frameRate)
         tau = range(n)/self.frameRate
 
-    @jit
     def getMeanSquaredDisplacement(self, tau=None):
         if tau is None:
             tau = np.logspace(-1,3,200)
@@ -659,7 +658,6 @@ class WormTrajectoryEnsembleGroup(object):
         self._ensembles.sort(cmp=cmp, key=key)
 
     def plotSpeedDistribution(self, showPlot=True):
-        plt.figure()
         for ens in self:
             color = (self.colorScheme[ens]
                      if ens in self.colorScheme
@@ -671,7 +669,6 @@ class WormTrajectoryEnsembleGroup(object):
             plt.show()
 
     def plotSpeedAutocorrelation(self, showPlot=True):
-        plt.figure()
         for ens in self:
             color = (self.colorScheme[ens]
                      if ens in self.colorScheme
@@ -683,7 +680,6 @@ class WormTrajectoryEnsembleGroup(object):
             plt.show()
 
     def plotMeanSquaredDisplacement(self, showPlot=True):
-        plt.figure()
         for ens in self:
             color = (self.colorScheme[ens]
                      if ens in self.colorScheme
