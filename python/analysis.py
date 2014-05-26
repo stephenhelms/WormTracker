@@ -55,6 +55,14 @@ def acf(x, lags=500):
         for i in lags])
 
 
+def circacf(x, lags=500):
+    if type(lags) is int:
+        lags = xrange(1, lags)
+
+    return np.array([np.mean(np.cos(x[lag:]-x[:-lag]))
+                     for lag in lags])
+
+
 def dotacf(x, lags=500):
     if type(lags) is int:
         lags = xrange(lags)
