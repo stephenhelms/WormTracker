@@ -359,6 +359,16 @@ class WormTrajectoryPostProcessor:
                                       dtype='f8')
         self.h5ref['Xtail'][...] = self.Xtail.filled(np.NaN)
         # postural measurements
+        if 'avgLength' not in self.h5ref:
+            self.h5ref.create_dataset('avgLength',
+                                      (1,),
+                                      dtype='f8')
+        self.h5ref['avgLength'][...] = self.length
+        if 'avgWidth' not in self.h5ref:
+            self.h5ref.create_dataset('avgWidth',
+                                      (1,),
+                                      dtype='f8')
+        self.h5ref['avgWidth'][...] = self.width
         if 'Ctheta' not in self.h5ref:
             self.h5ref.create_dataset('Ctheta',
                                       (self.nAngles, self.nAngles),

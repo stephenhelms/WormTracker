@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import h5py
 import itertools
 import cv2
-import wormimageprocessor as wip
+import wormtracker.wormimageprocessor as wip
 import multiprocessing as multi
 from numba import jit
 
@@ -47,19 +47,21 @@ def pairwise(iterable):
 
 def acf(x, lags=500):
     # from stackexchange
-    x = x - np.mean(x)  # remove mean
+    x = x - x.mean() # remove mean
     if type(lags) is int:
         lags = range(1, lags)
 
-    return np.array([1]+[np.corrcoef(x[:-i], x[i:])[0, 1] \
-        for i in lags])
+    return ma.array([1] +
+                    [ma.corrcoef(x[:-i], x[i:])[0, 1]
+                     for i in lags])
 
 
 def circacf(x, lags=500):
     if type(lags) is int:
         lags = xrange(1, lags)
 
-    return np.array([np.mean(np.cos(x[lag:]-x[:-lag]))
+    return np.array([1] +
+                    [np.mean(np.cos(x[lag:]-x[:-lag]))
                      for lag in lags])
 
 
@@ -79,44 +81,39 @@ class WormTrajectory:
 
     def __init__(self, h5obj, strain, wormID, videoFilePath=None):
         self.h5obj = h5obj
-        self.h5ref = h5obj['worms'][strain][wormID]
+        self.h5ref = self.h5obj['worms'][strain][wormID]
         self.strain = strain
         self.wormID = wormID
-        self.frameRate = h5obj['/video/frameRate'][...]
-        self.pixelsPerMicron = h5obj['/video/pixelsPerMicron'][...]
+        self.frameRate = self.h5obj['/video/frameRate'][0]
+        self.pixelsPerMicron = self.h5obj['/video/pixelsPerMicron'][0]
         self.foodCircle = self.h5ref['foodCircle'][...] / self.pixelsPerMicron
-        self.t = self.h5ref['time'][...]
+        self.t = self.h5ref['time']
         self.maxFrameNumber = self.t.shape[0]
-        self.X = ma.array(self.h5ref['centroid'][...] / self.pixelsPerMicron)
-        self.Xhead = ma.zeros(self.X.shape)
-        self.v = ma.zeros(self.X.shape)
-        self.s = ma.zeros((self.maxFrameNumber,))
-        self.phi = ma.zeros((self.maxFrameNumber,))
-        self.length = np.NaN
-        self.width = np.NaN
-        if 'badFrames' in self.h5ref:
-            self.badFrames = self.h5ref['badFrames'][...]
-            self.allCentroidMissing = np.all(self.badFrames)
-        else:
-            self.badFrames = np.zeros((self.maxFrameNumber,), dtype='bool')
+        self.X = self.h5ref['X']
+        self.Xhead = self.h5ref['Xhead']
+        self.v = self.h5ref['v']
+        self.s = self.h5ref['s']
+        self.phi = self.h5ref['phi']
+        self.psi = self.h5ref['psi']
+        self.dpsi = self.h5ref['dpsi']
+        self.Ctheta = self.h5ref['Ctheta']
+        self.ltheta = self.h5ref['ltheta']
+        self.vtheta = self.h5ref['vtheta']
+        self.length = self.h5ref['avgLength']
+        self.width = self.h5ref['avgWidth']
+        self.badFrames = self.h5ref['badFrames'][...]
+        self.allCentroidMissing = np.all(self.badFrames)
+
         if videoFilePath is not None:
-            videoFile = h5obj['/video/videoFile'][0]
+            videoFile = self.h5obj['/video/videoFile'][0]
             self.videoFile = os.path.join(videoFilePath, videoFile)
         else:
             self.videoFile = None
 
-        self.skeleton = ma.array(self.h5ref['skeletonSpline'][...])
-        self.posture = ma.array(self.h5ref['posture'][...])
-        if 'orientationFixed' in self.h5ref:
-            self.orientationFixed = self.h5ref['orientationFixed'][...]
-            self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
-        else:
-            self.orientationFixed = ma.zeros((self.maxFrameNumber,), dtype='bool')
-
-    def process(self):
-        self.readFirstFrame()
-        self.extractMeasurements()
-        self.calculatePosturalMeasurements()
+        self.skeleton = self.h5ref['skeletonSpline']
+        self.posture = self.h5ref['posture']
+        self.orientationFixed = self.h5ref['orientationFixed'][...]
+        self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
 
     def readFirstFrame(self):
         if self.videoFile is None:
@@ -154,42 +151,20 @@ class WormTrajectory:
         # width
         return ip
 
-    def excludeBadFrames(self):
-        self.t[self.badFrames] = ma.masked
-        self.X[self.badFrames, :] = ma.masked
-        self.v[self.badFrames, :] = ma.masked
-        self.s[self.badFrames] = ma.masked
-        self.phi[self.badFrames] = ma.masked
-        self.skeleton[np.logical_not(self.orientationFixed), :, :] = ma.masked
-        self.psi[np.logical_not(self.orientationFixed)] = ma.masked
-        self.dpsi[np.logical_or(np.logical_not(self.orientationFixed),
-                                self.badFrames)] = ma.masked
-        self.posture[np.logical_not(self.orientationFixed), :] = ma.masked
+    def getMaskedCentroid(self, data):
+        data = ma.array(data)
+        sel = self.badFrames
+        data[sel, ...] = ma.masked
+        data[np.isnan(data)] = ma.masked
+        return data
 
-    def extractMeasurements(self):
-        self.X[self.badFrames, :] = ma.masked
-        self.v[1:-1] = (self.X[2:, :] - self.X[0:-2])/(2.0/self.frameRate)
-        self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
-        self.phi = np.arctan2(self.v[:, 1], self.v[:, 0])
-        self.Xhead = np.squeeze(self.skeleton[:, 0, :])
-        self.Xhead = ((self.Xhead + self.h5ref['boundingBox'][:, :2]) /
-                      self.pixelsPerMicron)
-        self.Xhead[np.logical_not(self.orientationFixed), :] = ma.masked
-        self.psi = np.arctan2(self.Xhead[:, 1]-self.X[:, 1],
-                              self.Xhead[:, 0]-self.X[:, 0])
-        self.dpsi = self.phi - self.psi
-        self.excludeBadFrames()
-
-    def calculatePosturalMeasurements(self):
-        missing = np.any(self.posture.mask, axis=1)
-        if np.all(missing):
-            self.C_posture = None
-            self.l_posture = None
-            self.v_posture = None
-        else:
-            posture = self.posture[~missing, :].T
-            self.C_posture = np.cov(posture)
-            self.l_posture, self.v_posture = LA.eig(self.C_posture)
+    def getMaskedPosture(self, data):
+        data = ma.array(data)
+        sel = np.logical_or(np.logical_not(self.orientationFixed),
+                            self.badFrames)
+        data[sel, ...] = ma.masked
+        data[np.isnan(data)] = ma.masked
+        return data
 
     def plotTrajectory(self, color='k', showFrame=True, showPlot=True):
         if showFrame and self.firstFrame is not None:
@@ -200,11 +175,14 @@ class WormTrajectory:
                                0,
                                self.firstFrame.shape[0]/self.pixelsPerMicron))
             plt.hold(True)
-        plt.scatter(self.X[:, 0], self.X[:, 1], c=color, s=10)
+        X = self.getMaskedCentroid(self.X)
+        plt.scatter(X[:, 0], X[:, 1], c=color, s=10)
         plt.hold(True)
-        circle = plt.Circle(self.foodCircle[0:2], radius=self.foodCircle[-1],
-                            color='r', fill=False)
-        plt.gca().add_patch(circle)
+        if self.foodCircle is not None:
+            circle = plt.Circle(self.foodCircle[0:2],
+                                radius=self.foodCircle[-1],
+                                color='r', fill=False)
+            plt.gca().add_patch(circle)
         plt.xlim((0, 10000))
         plt.ylim((0, 10000))
         plt.xlabel('x (um)')
@@ -215,7 +193,8 @@ class WormTrajectory:
             plt.show()
 
     def plotSpeed(self, showPlot=True):
-        plt.plot(self.t, self.s, 'k.')
+        s = self.getMaskedCentroid(self.s)
+        plt.plot(self.t, s, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Speed (um/s)')
         plt.box('off')
@@ -223,7 +202,8 @@ class WormTrajectory:
             plt.show()
 
     def plotBearing(self, showPlot=True):
-        plt.plot(self.t, self.phi/np.pi, 'k.')
+        phi = self.getMaskedCentroid(self.phi)
+        plt.plot(self.t, phi/np.pi, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Bearing ($\pi$ rad)')
         plt.box('off')
@@ -234,15 +214,16 @@ class WormTrajectory:
         if bins is None:
             bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
 
-        out = np.histogram(self.s.compressed(), bins,
+        s = self.getMaskedCentroid(self.s)
+        out = np.histogram(s.compressed(), bins,
                            density=True)
         return out
 
     def plotSpeedDistribution(self, bins=None, color='k', showPlot=True):
         if bins is None:
             bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
-
-        plt.hist(self.s.compressed(), bins, normed=True, facecolor=color)
+        s = self.getMaskedCentroid(self.s)
+        plt.hist(s.compressed(), bins, normed=True, facecolor=color)
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.box('off')
@@ -250,32 +231,46 @@ class WormTrajectory:
             plt.show()
 
     def getSpeedAutocorrelation(self, maxT=100):
-        n = np.round(maxT*self.frameRate)
+        n = int(np.round(maxT*self.frameRate))
         tau = range(n)/self.frameRate
-        C = acf(self.s, n)
+        s = self.getMaskedCentroid(self.s)
+        C = acf(s, n)
         return tau, C
 
     def plotSpeedAutocorrelation(self, maxT=100, color='k', showPlot=True):
         tau, C = self.getSpeedAutocorrelation(maxT)
-        plt.semilogx(tau, C, '-', color=color)
-        plt.xlabel(r'$\log \tau / (s)$')
+        plt.plot(tau, C, '-', color=color)
+        plt.xlabel(r'$\tau (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
         plt.box('off')
         if showPlot:
             plt.show()
 
-    def plotBearingAutocorrelation(self, maxT=100):
-        n = np.round(maxT*self.frameRate)
+    def getBearingAutocorrelation(self, maxT=100):
+        n = int(np.round(maxT*self.frameRate))
         tau = range(n)/self.frameRate
+        psi = self.getMaskedPosture(self.psi)
+        C = circacf(psi, n)
+        return tau, C
+
+    def plotBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):
+        tau, C = self.getBearingAutocorrelation(maxT)
+        plt.semilogx(tau, C, '-', color=color)
+        plt.xlabel(r'$\log \tau / (s)$')
+        plt.ylabel(r'$\langle \cos\left[\psi(t)-\psi(t+\tau)\right]\rangle$')
+        plt.box('off')
+        if showPlot:
+            plt.show()
 
     def getMeanSquaredDisplacement(self, tau=None):
         if tau is None:
-            tau = np.logspace(-1,3,200)
+            tau = np.logspace(-1, 3, 200)
 
         lags = np.round(tau*self.frameRate)
         Sigma = ma.zeros((200,))
+        X = self.getMaskedCentroid(self.X)
         for i, lag in enumerate(lags):
-            displacements = self.X[lag:, :] - self.X[:-lag, :]
+            displacements = X[lag:, :] - X[:-lag, :]
             Sigma[i] = np.mean(np.log10(np.sum(displacements**2, axis=1)))
 
         return (tau, Sigma)
@@ -290,18 +285,19 @@ class WormTrajectory:
             plt.show()
 
     def plotPosturalCovariance(self, showPlot=True):
-        if self.C_posture is None:
+        if self.Ctheta is None:
             return
-        plt.imshow(self.C_posture, plt.get_cmap('PuOr'))
-        plt.clim((-0.3,0.3))
+        plt.imshow(self.Ctheta, plt.get_cmap('PuOr'))
+        plt.clim((-0.3, 0.3))
         plt.colorbar()
+        plt.grid(False)
         if showPlot:
             plt.show()
 
     def plotPosturalModeDistribution(self, color='k', showPlot=True):
-        if self.C_posture is None:
+        if self.Ctheta is None:
             return
-        plt.plot(self.l_posture/np.sum(self.l_posture), '.-', color=color,
+        plt.plot(self.ltheta/np.sum(self.ltheta), '.-', color=color,
                  label='{0} {1}'.format(self.strain, self.wormID))
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
@@ -311,12 +307,13 @@ class WormTrajectory:
             plt.show()
 
     def plotPosturalTimeSeries(self, postureVec, color='k', showPlot=True):
-        if self.C_posture is None:
+        if self.Ctheta is None:
             return
         if isinstance(postureVec, int):
-            postureVec = self.v_posture[:, postureVec]
-        A = np.dot(self.posture, postureVec)
-        missing = np.any(self.posture.mask, axis=1)
+            postureVec = self.vtheta[:, postureVec]
+        posture = self.getMaskedPosture(self.posture)
+        A = np.dot(posture, postureVec)
+        missing = np.any(posture.mask, axis=1)
         A[missing] = ma.masked
         plt.plot(self.t, A, '.', color=color,
                  label='{0} {1}'.format(self.strain, self.wormID))
@@ -325,36 +322,19 @@ class WormTrajectory:
 
     def plotPosturalPhaseSpace(self, postureVec1, postureVec2, color='k',
                                showPlot=True):
-        if self.C_posture is None:
+        if self.Ctheta is None:
             return
         if isinstance(postureVec1, int):
-            postureVec1 = self.v_posture[:, postureVec1]
-        missing = np.any(self.posture.mask, axis=1)
-        A = np.dot(self.posture, postureVec1)
-        A[missing] = ma.masked
+            postureVec1 = self.vtheta[:, postureVec1]
         if isinstance(postureVec2, int):
-            postureVec2 = self.v_posture[:, postureVec2]
-        B = np.dot(self.posture, postureVec2)
+            postureVec2 = self.vtheta[:, postureVec2]
+        posture = self.getMaskedPosture(self.posture)
+        missing = np.any(posture.mask, axis=1)
+        A = np.dot(posture, postureVec1)
+        A[missing] = ma.masked
+        B = np.dot(posture, postureVec2)
         B[missing] = ma.masked
         plt.scatter(A, B, marker='.', c=color, s=5)
-        plt.box('off')
-        if showPlot:
-            plt.show()
-
-    def plotPosturalPhaseSpaceDensity(self, postureVec1, postureVec2,
-                               showPlot=True):
-        if self.C_posture is None:
-            return
-        if isinstance(postureVec1, int):
-            postureVec1 = self.v_posture[:, postureVec1]
-        missing = np.any(self.posture.mask, axis=1)
-        A = np.dot(self.posture, postureVec1)
-        A[missing] = ma.masked
-        if isinstance(postureVec2, int):
-            postureVec2 = self.v_posture[:, postureVec2]
-        B = np.dot(self.posture, postureVec2)
-        B[missing] = ma.masked
-        plt.hexbin(A, B)
         plt.box('off')
         if showPlot:
             plt.show()
@@ -431,43 +411,33 @@ class WormTrajectoryEnsemble:
             key = lambda t: int(t.wormID)
         self._trajectories.sort(cmp=cmp, key=key)
 
-    def processAll(self):
+    def readFirstFrameAll(self):
         for t in self:
-            t.process()
-
-    def processAllParallel(self):
-        # Buggy?
-        pool = multi.Pool()
-        print 'Processing trajectories in parallel...'
-        result = pool.map_async(lambda t: t.process(), self)
-        result.get()
-        print 'Done processing.'
-        pool.join()
-        pool.close()
+            t.readFirstFrame()
 
     def calculatePosturalMeasurements(self):
         posture = []
         for traj in self:
-            missing = np.any(traj.posture.mask, axis=1)
+            posture = traj.getMaskedPosture(traj.posture)
+            missing = np.any(posture.mask, axis=1)
             if np.all(missing):
                 continue
             else:
-                posture.append(traj.posture[~missing, :])   
+                posture.append(posture[~missing, :])   
         if len(posture) > 0:
             posture = np.concatenate(posture).T
-            self.C_posture = np.cov(posture)
-            self.l_posture, self.v_posture = LA.eig(self.C_posture)
+            self.Ctheta = np.cov(posture)
+            self.ltheta, self.vtheta = LA.eig(self.Ctheta)
         else:
-            self.C_posture = None
-            self.l_posture = None
-            self.v_posture = None
+            self.Ctheta = None
+            self.ltheta = None
+            self.vtheta = None
 
     def ensembleAverage(self, compFunc, nSamples=1000):
         samples = np.array([compFunc(traj) for traj in self])
         return bootstrap(samples, nSamples)
 
     def tilePlots(self, plotFunc, ni=4, nj=4):
-        plt.figure()
         for i, t in enumerate(self):
             plt.subplot(ni, nj, i+1)
             plotFunc(t)
@@ -507,9 +477,23 @@ class WormTrajectoryEnsemble:
 
     def plotSpeedAutocorrelation(self, maxT=100, color='k', showPlot=True):
         # assume all same frame rate
-        n = np.round(maxT*self[0].frameRate)
+        n = int(np.round(maxT*self[0].frameRate))
         tau = range(n)/self[0].frameRate
         C, Cl, Cu = self.ensembleAverage(lambda x: x.getSpeedAutocorrelation(maxT)[1])
+        plt.plot(tau, C, '.-', color=color, label=self.name)
+        plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
+        plt.xlabel(r'$\tau (s)$')
+        plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.box('off')
+        # TODO: smart xlim
+        if showPlot:
+            plt.show()
+
+    def plotBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):
+        # assume all same frame rate
+        n = int(np.round(maxT*self[0].frameRate))
+        tau = range(n)/self[0].frameRate
+        C, Cl, Cu = self.ensembleAverage(lambda x: x.getBearingAutocorrelation(maxT)[1])
         plt.semilogx(tau, C, '.-', color=color, label=self.name)
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
         plt.xlabel(r'$\log \tau / (s)$')
@@ -533,19 +517,19 @@ class WormTrajectoryEnsemble:
             plt.show()
 
     def plotPosturalCovariance(self, showPlot=True):
-        if self.C_posture is None:
+        if self.Ctheta is None:
             return
-        plt.imshow(self.C_posture, plt.get_cmap('PuOr'))
-        plt.clim((-0.3,0.3))
+        plt.imshow(self.Ctheta, plt.get_cmap('PuOr'))
+        plt.clim((-0.3, 0.3))
         plt.colorbar()
         plt.box('off')
         if showPlot:
             plt.show()
 
     def plotPosturalModeDistribution(self, color='k', showPlot=True):
-        if self.C_posture is None:
+        if self.Ctheta is None:
             return
-        plt.plot(self.l_posture/np.sum(self.l_posture), '.-', color=color)
+        plt.plot(self.ltheta/np.sum(self.ltheta), '.-', color=color)
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
         plt.ylim((0, 1))
@@ -553,8 +537,8 @@ class WormTrajectoryEnsemble:
         if showPlot:
             plt.show()
 
-    def plotAveragePosturalModelDistribution(self, color='k', showPlot=True):
-        l, ll, lu = self.ensembleAverage(lambda x: x.l_posture / np.sum(x.l_posture))
+    def plotAveragePosturalModeDistribution(self, color='k', showPlot=True):
+        l, ll, lu = self.ensembleAverage(lambda x: x.ltheta / np.sum(x.ltheta))
         plt.plot(l, '.-', color=color)
         plt.hold(True)
         plt.fill_between(xrange(l.shape[0]), ll, lu,
@@ -567,23 +551,24 @@ class WormTrajectoryEnsemble:
             plt.show()
 
     def plotPosturalPhaseSpaceDensity(self, postureVec1, postureVec2,
-                               showPlot=True):
-        if self.C_posture is None:
+                                      showPlot=True):
+        if self.Ctheta is None:
             return
         if isinstance(postureVec1, int):
-            postureVec1 = self.v_posture[:, postureVec1]
+            postureVec1 = self.vtheta[:, postureVec1]
         if isinstance(postureVec2, int):
-                postureVec2 = self.v_posture[:, postureVec2]
+                postureVec2 = self.vtheta[:, postureVec2]
         A = []
         B = []
         for traj in self:
-            if traj.C_posture is None:
+            if traj.Ctheta is None:
                 continue
-            missing = np.any(traj.posture.mask, axis=1)
-            a = np.dot(traj.posture, postureVec1)
+            posture = traj.getMaskedPosture(traj.posture)
+            missing = np.any(posture.mask, axis=1)
+            a = np.dot(posture, postureVec1)
             a[missing] = ma.masked
             A.append(a)
-            b = np.dot(traj.posture, postureVec2)
+            b = np.dot(posture, postureVec2)
             b[missing] = ma.masked
             B.append(b)
         plt.hexbin(np.concatenate(A), np.concatenate(B), bins='log')
@@ -665,6 +650,17 @@ class WormTrajectoryEnsembleGroup(object):
             key = lambda e: e.name
         self._ensembles.sort(cmp=cmp, key=key)
 
+    def tilePlots(self, plotFunc, ni=1, nj=None, showPlot=True):
+        if nj is None:
+            nj = np.ceil(len(self)/ni)
+        if ni is None:
+            ni = np.ceil(len(self)/nj)
+        for i, e in enumerate(self):
+            plt.subplot(ni, nj, i+1)
+            plotFunc(e)
+            plt.title(e.name)
+        plt.show()
+
     def plotSpeedDistribution(self, showPlot=True):
         for ens in self:
             color = (self.colorScheme[ens]
@@ -694,6 +690,17 @@ class WormTrajectoryEnsembleGroup(object):
                      else 'k')
             ens.plotMeanSquaredDisplacement(color=color,
                                             showPlot=False)
+        plt.legend()
+        if showPlot:
+            plt.show()
+
+    def plotPosturalModeDistribution(self, showPlot=True):
+        for ens in self:
+            color = (self.colorScheme[ens]
+                     if ens in self.colorScheme
+                     else 'k')
+            ens.plotAveragePosturalModeDistribution(color=color,
+                                                    showPlot=False)
         plt.legend()
         if showPlot:
             plt.show()

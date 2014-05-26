@@ -8,7 +8,7 @@ import h5py
 from subprocess import check_output
 import sys
 import os
-import wormimageprocessor as wp
+import wormtracker.wormimageprocessor as wp
 import roitools
 import time
 import multiprocessing
