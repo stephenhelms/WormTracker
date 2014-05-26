@@ -188,7 +188,6 @@ class WormTrajectory:
         plt.xlabel('x (um)')
         plt.xlabel('y (um)')
         plt.gca().set_aspect('equal')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -197,7 +196,6 @@ class WormTrajectory:
         plt.plot(self.t, s, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Speed (um/s)')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -206,7 +204,6 @@ class WormTrajectory:
         plt.plot(self.t, phi/np.pi, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Bearing ($\pi$ rad)')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -226,7 +223,6 @@ class WormTrajectory:
         plt.hist(s.compressed(), bins, normed=True, facecolor=color)
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -242,7 +238,6 @@ class WormTrajectory:
         plt.plot(tau, C, '-', color=color)
         plt.xlabel(r'$\tau (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -258,7 +253,6 @@ class WormTrajectory:
         plt.semilogx(tau, C, '-', color=color)
         plt.xlabel(r'$\log \tau / (s)$')
         plt.ylabel(r'$\langle \cos\left[\psi(t)-\psi(t+\tau)\right]\rangle$')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -280,7 +274,6 @@ class WormTrajectory:
         plt.plot(np.log10(tau), Sigma, 'k.')
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -288,7 +281,7 @@ class WormTrajectory:
         if self.Ctheta is None:
             return
         plt.imshow(self.Ctheta, plt.get_cmap('PuOr'))
-        plt.clim((-0.3, 0.3))
+        plt.clim((-0.5, 0.5))
         plt.colorbar()
         plt.grid(False)
         if showPlot:
@@ -302,7 +295,6 @@ class WormTrajectory:
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
         plt.ylim((0, 1))
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -335,7 +327,6 @@ class WormTrajectory:
         B = np.dot(posture, postureVec2)
         B[missing] = ma.masked
         plt.scatter(A, B, marker='.', c=color, s=5)
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -418,12 +409,12 @@ class WormTrajectoryEnsemble:
     def calculatePosturalMeasurements(self):
         posture = []
         for traj in self:
-            posture = traj.getMaskedPosture(traj.posture)
-            missing = np.any(posture.mask, axis=1)
+            posturea = traj.getMaskedPosture(traj.posture)
+            missing = np.any(posturea.mask, axis=1)
             if np.all(missing):
                 continue
             else:
-                posture.append(posture[~missing, :])   
+                posture.append(posturea[~missing, :])   
         if len(posture) > 0:
             posture = np.concatenate(posture).T
             self.Ctheta = np.cov(posture)
@@ -454,7 +445,6 @@ class WormTrajectoryEnsemble:
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.xlim([0,max(bins)])
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -470,7 +460,6 @@ class WormTrajectoryEnsemble:
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.xlim([0, max(bins)])
-        plt.box('off')
         plt.legend()
         if showPlot:
             plt.show()
@@ -484,7 +473,6 @@ class WormTrajectoryEnsemble:
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
         plt.xlabel(r'$\tau (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
-        plt.box('off')
         # TODO: smart xlim
         if showPlot:
             plt.show()
@@ -498,7 +486,6 @@ class WormTrajectoryEnsemble:
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
         plt.xlabel(r'$\log \tau / (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
-        plt.box('off')
         # TODO: smart xlim
         if showPlot:
             plt.show()
@@ -512,7 +499,6 @@ class WormTrajectoryEnsemble:
         plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -520,9 +506,8 @@ class WormTrajectoryEnsemble:
         if self.Ctheta is None:
             return
         plt.imshow(self.Ctheta, plt.get_cmap('PuOr'))
-        plt.clim((-0.3, 0.3))
+        plt.clim((-0.5, 0.5))
         plt.colorbar()
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -533,7 +518,6 @@ class WormTrajectoryEnsemble:
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
         plt.ylim((0, 1))
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -546,7 +530,6 @@ class WormTrajectoryEnsemble:
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
         plt.ylim((0, 1))
-        plt.box('off')
         if showPlot:
             plt.show()
 
@@ -649,6 +632,10 @@ class WormTrajectoryEnsembleGroup(object):
         if cmp is None and key is None:
             key = lambda e: e.name
         self._ensembles.sort(cmp=cmp, key=key)
+
+    def calculatePosturalMeasurements(self):
+        for ens in self:
+            ens.calculatePosturalMeasurements()
 
     def tilePlots(self, plotFunc, ni=1, nj=None, showPlot=True):
         if nj is None:
