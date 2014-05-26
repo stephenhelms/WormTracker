@@ -1,7 +1,6 @@
 import numpy as np
 import numpy.ma as ma
-import itertools
-import wormtracker as wt
+from numpy import linalg as LA
 from numba import jit
 
 
@@ -41,6 +40,18 @@ class WormTrajectoryPostProcessor:
         self.posture = None
         self.length = None
         self.width = None
+        self.t = self.h5ref['time'][...]
+        self.X = ma.array(self.h5ref['centroid'][...] / self.pixelsPerMicron)
+        self.Xhead = ma.zeros(self.X.shape)
+        self.Xtail = ma.zeros(self.X.shape)
+        self.v = ma.zeros(self.X.shape)
+        self.s = ma.zeros((self.maxFrameNumber,))
+        self.phi = ma.zeros((self.maxFrameNumber,))
+        self.psi = ma.zeros((self.maxFrameNumber,))
+        self.dpsi = ma.zeros((self.maxFrameNumber,))
+        self.Ctheta = None
+        self.ltheta = None
+        self.vtheta = None
 
     def postProcess(self):
         print 'Identifying bad frames...'
@@ -55,6 +66,10 @@ class WormTrajectoryPostProcessor:
         self.assignHeadTail()
         print 'Ordering postural data head to tail...'
         self.orderHeadTail()
+        print 'Calculating centroid motion variables...'
+        self.calculateCentroidMeasurements()
+        print 'Calculate postural measurements...'
+        self.calculatePosturalMeasurements()
 
     def identifyBadFrames(self):
         badFrames = np.logical_or(self.lengths == 0,
@@ -76,7 +91,7 @@ class WormTrajectoryPostProcessor:
     def extractPosturalData(self):
         # import skeleton splines
         self.skeleton = self.h5ref['skeletonSpline'][...]
-        self.posture = self.h5ref['posture'][...]
+        self.posture = ma.array(self.h5ref['posture'][...])
         self.haveSkeleton = [np.any(skeleton > 0)
                              for skeleton in self.skeleton]
 
@@ -119,7 +134,7 @@ class WormTrajectoryPostProcessor:
         sel = self.haveSkeleton and flipped
         self.skeleton[sel, :, :] = np.flipud(np.squeeze(
             self.skeleton[sel, :, :]))
-        self.posture[sel, :] = np.flipud(np.squeeze(self.posture[sel, :])) 
+        self.posture[sel, :] = np.flipud(np.squeeze(self.posture[sel, :]))
 
     def segment(self):
         # break video into segments with matched skeletons
@@ -219,7 +234,51 @@ class WormTrajectoryPostProcessor:
                         np.fliplr(self.posture[b:e, :])
         self.orientationFixed = orientationFixed
 
+    def calculateCentroidMeasurements(self):
+        self.X[self.badFrames, :] = ma.masked
+        self.v[1:-1] = (self.X[2:, :] - self.X[0:-2])/(2.0/self.frameRate)
+        self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
+        self.phi = np.arctan2(self.v[:, 1], self.v[:, 0])
+        self.t[self.badFrames] = ma.masked
+        self.X[self.badFrames, :] = ma.masked
+        self.v[self.badFrames, :] = ma.masked
+        self.s[self.badFrames] = ma.masked
+        self.phi[self.badFrames] = ma.masked
+
+    def calculatePosturalMeasurements(self):
+        self.Xhead = ma.array(np.squeeze(self.skeleton[:, 0, :]))
+        self.Xhead = ((self.Xhead + self.h5ref['boundingBox'][:, :2]) /
+                      self.pixelsPerMicron)
+        self.Xhead[np.logical_not(self.orientationFixed), :] = ma.masked
+        self.Xtail = ma.array(np.squeeze(self.skeleton[:, -1, :]))
+        self.Xtail = ((self.Xtail + self.h5ref['boundingBox'][:, :2]) /
+                      self.pixelsPerMicron)
+        self.Xtail[np.logical_not(self.orientationFixed), :] = ma.masked
+        self.psi = np.arctan2(self.Xhead[:, 1]-self.X[:, 1],
+                              self.Xhead[:, 0]-self.X[:, 0])
+        self.dpsi = self.phi - self.psi
+        self.psi[np.logical_not(self.orientationFixed)] = ma.masked
+        self.dpsi[np.logical_or(np.logical_not(self.orientationFixed),
+                                self.badFrames)] = ma.masked
+        self.Xhead[np.logical_or(np.logical_not(self.orientationFixed),
+                                 self.badFrames), :] = ma.masked
+        self.Xtail[np.logical_or(np.logical_not(self.orientationFixed),
+                                 self.badFrames), :] = ma.masked
+
+        self.skeleton[np.logical_not(self.orientationFixed), :, :] = ma.masked
+        self.posture[np.logical_not(self.orientationFixed), :] = ma.masked
+        missing = np.any(self.posture.mask, axis=1)
+        if np.all(missing):
+            self.Ctheta = None
+            self.ltheta = None
+            self.vtheta = None
+        else:
+            posture = self.posture[~missing, :].T
+            self.Ctheta = np.cov(posture)
+            self.ltheta, self.vtheta = LA.eig(self.Ctheta)
+
     def store(self):
+        # head assignment
         if 'segments' not in self.h5ref:
                 self.h5ref.create_dataset('segments',
                                           (len(self.segments), 2),
@@ -258,6 +317,70 @@ class WormTrajectoryPostProcessor:
         self.h5ref['skeletonSpline'][...] = self.skeleton
         self.h5ref['posture'][...] = self.posture
 
+        # centroid measurements
+        if 'X' not in self.h5ref:
+            self.h5ref.create_dataset('X',
+                                      (self.maxFrameNumber, 2),
+                                      dtype='f8')
+        self.h5ref['X'][...] = self.X.filled(np.NaN)
+        if 'v' not in self.h5ref:
+            self.h5ref.create_dataset('v',
+                                      (self.maxFrameNumber, 2),
+                                      dtype='f8')
+        self.h5ref['v'][...] = self.v.filled(np.NaN)
+        if 's' not in self.h5ref:
+            self.h5ref.create_dataset('s',
+                                      (self.maxFrameNumber,),
+                                      dtype='f8')
+        self.h5ref['s'][...] = self.s.filled(np.NaN)
+        if 'phi' not in self.h5ref:
+            self.h5ref.create_dataset('phi',
+                                      (self.maxFrameNumber,),
+                                      dtype='f8')
+        self.h5ref['phi'][...] = self.phi.filled(np.NaN)
+        if 'psi' not in self.h5ref:
+            self.h5ref.create_dataset('psi',
+                                      (self.maxFrameNumber,),
+                                      dtype='f8')
+        self.h5ref['psi'][...] = self.psi.filled(np.NaN)
+        if 'dpsi' not in self.h5ref:
+            self.h5ref.create_dataset('dpsi',
+                                      (self.maxFrameNumber,),
+                                      dtype='f8')
+        self.h5ref['dpsi'][...] = self.dpsi.filled(np.NaN)
+        if 'Xhead' not in self.h5ref:
+            self.h5ref.create_dataset('Xhead',
+                                      (self.maxFrameNumber, 2),
+                                      dtype='f8')
+        self.h5ref['Xhead'][...] = self.Xhead.filled(np.NaN)
+        if 'Xtail' not in self.h5ref:
+            self.h5ref.create_dataset('Xtail',
+                                      (self.maxFrameNumber, 2),
+                                      dtype='f8')
+        self.h5ref['Xtail'][...] = self.Xtail.filled(np.NaN)
+        # postural measurements
+        if 'Ctheta' not in self.h5ref:
+            self.h5ref.create_dataset('Ctheta',
+                                      (self.nAngles, self.nAngles),
+                                      maxshape=(100, 100),
+                                      dtype='f8')
+        if self.Ctheta is not None:
+            self.h5ref['Ctheta'][...] = self.Ctheta
+        if 'ltheta' not in self.h5ref:
+            self.h5ref.create_dataset('ltheta',
+                                      (self.nAngles,),
+                                      maxshape=(100,),
+                                      dtype='f8')
+        if self.ltheta is not None:
+            self.h5ref['ltheta'][...] = self.ltheta
+        if 'vtheta' not in self.h5ref:
+            self.h5ref.create_dataset('vtheta',
+                                      (self.nAngles, self.nAngles),
+                                      maxshape=(100, 100),
+                                      dtype='f8')
+        if self.vtheta is not None:
+            self.h5ref['vtheta'][...] = self.vtheta
+
 
 def _getMotionVariables(X, dt):
     v = ma.zeros(X.shape)
@@ -267,19 +390,3 @@ def _getMotionVariables(X, dt):
     s = np.sqrt(np.sum(np.power(v, 2), axis=1))
     phi = np.arctan2(v[:, 1], v[:, 0])
     return (v, s, phi)
-
-"""
-
-    % If the worm isn't moving much, check whether one end is moving more
-    % than the other and assign that as the head (foraging movements)
-    if max(nanmean(analysis.s_ends(select,:),1)) / ...
-            min(nanmean(analysis.s_ends(select,:),1)) > vend_rthreshold
-        % If the second end is moving more, the skeleton is reversed
-        if diff(nanmean(analysis.s_ends(select,:),1)) > 0
-            flip(select);
-        end
-        analysis.segment_ht_assign_method(n) = 2;
-        continue;
-    end
-
-"""
