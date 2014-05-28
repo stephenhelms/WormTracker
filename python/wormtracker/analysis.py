@@ -4,8 +4,10 @@ import numpy.ma as ma
 from numpy import linalg as LA
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import h5py
 import itertools
+import collections
 import cv2
 import wormtracker.wormimageprocessor as wip
 import multiprocessing as multi
@@ -74,12 +76,9 @@ def dotacf(x, lags=500):
 
 class WormTrajectory:
     filterByWidth = False
-    firstFrame = None
-    allCentroidMissing = False
-    allPostureMissing = False
-    attr = {}
 
     def __init__(self, h5obj, strain, wormID, videoFilePath=None):
+        self.firstFrame = None
         self.h5obj = h5obj
         self.h5ref = self.h5obj['worms'][strain][wormID]
         self.strain = strain
@@ -331,6 +330,90 @@ class WormTrajectory:
             plt.show()
 
 
+class WormTrajectoryStateImage:
+    def __init__(self, trajectory):
+        self.trajectory = trajectory
+        self.t = self.trajectory.t
+        self.badFrames = self.trajectory.badFrames
+        self.X = self.trajectory.getMaskedCentroid(self.trajectory.X)
+        self.skeleton = ma.array(self.trajectory.skeleton[:, 1:-1, :])
+        self.skeleton[~self.trajectory.orientationFixed, :, :] = ma.masked
+        self.posture = self.trajectory.getMaskedPosture(self.trajectory.posture)
+        self.pixelsPerMicron = self.trajectory.pixelsPerMicron
+        self.frameRate = self.trajectory.frameRate
+
+    def initialView(self):
+        self.axTraj = plt.subplot(1, 2, 1)
+        self.trajLine, = self.axTraj.plot([], [], 'k.')
+        plt.hold(True)
+        self.trajPoint, = self.axTraj.plot([], [], 'ro')
+        plt.xlim((0, 10000))
+        plt.xlabel('x (um)')
+        plt.ylim((0, 10000))
+        plt.ylabel('y (um)')
+        self.axTraj.set_aspect(1)
+
+        self.axWorm = plt.subplot(1, 2, 2)
+        self.imWorm = self.axWorm.imshow(np.zeros((1, 1)), plt.gray(),
+                                         interpolation='none',
+                                         vmin=0, vmax=255)
+        plt.hold(True)
+        self.postureSkel = self.axWorm.scatter([], [], c=[],
+                                               cmap=plt.get_cmap('PuOr'),
+                                               s=100)
+        self.centroid, = self.axWorm.plot([], [], 'ro')
+        plt.xticks([])
+        plt.yticks([])
+        #self.
+
+    def plot(self, frameNumber):
+        # trajectory plot
+        self.trajLine.set_xdata(self.X[:frameNumber, 0])
+        self.trajLine.set_ydata(self.X[:frameNumber, 1])
+        self.trajPoint.set_xdata(self.X[frameNumber, 0])
+        self.trajPoint.set_ydata(self.X[frameNumber, 1])
+        # worm plot
+        im = self.getWormImage(frameNumber)
+        self.imWorm.set_array(im)
+        self.imWorm.set_extent((0, im.shape[1], 0, im.shape[0]))
+        bb = self.trajectory.h5ref['boundingBox'][frameNumber,
+                                                  :2]
+        self.postureSkel.set_offsets(self.skeleton[frameNumber, :, :])
+        self.postureSkel.set_array(self.posture[frameNumber, :])
+        self.postureSkel.set_cmap(plt.get_cmap('PuOr'))
+        self.centroid.set_xdata(self.X[frameNumber, 0]*self.pixelsPerMicron - bb[0])
+        self.centroid.set_ydata(self.X[frameNumber, 1]*self.pixelsPerMicron - bb[1])
+
+    def getWormImage(self, frameNumber):
+        if not self.badFrames[frameNumber]:
+            bb = self.trajectory.h5ref['boundingBox'][frameNumber,
+                                                      2:]
+            im = self.trajectory.h5ref['grayWormImage'][frameNumber,
+                                                        :bb[1],
+                                                        :bb[0]]
+            im = cv2.normalize(im, alpha=0, beta=255,
+                               norm_type=cv2.NORM_MINMAX)
+        else:
+            im = np.ones((1, 1))
+        return im
+
+    def getAnimation(self, frames=None, interval=None, figure=None):
+        if figure is None:
+            figure = plt.figure()
+        if frames is None:
+            frames = xrange(self.t.shape[0])
+        if interval is None:
+            interval = 1000/self.frameRate
+        return animation.FuncAnimation(figure, self.plot,
+                                       frames=frames,
+                                       init_func=self.initialView,
+                                       interval=interval)
+
+    def showAnimation(self, frames=None, interval=None):
+        self.getAnimation(frames=frames, interval=interval)
+        plt.show()
+
+
 class WormTrajectoryEnsemble:
     def __init__(self, trajectoryIter=None, name=None, nameFunc=None):
         if any(not isinstance(it, WormTrajectory) for it in trajectoryIter):
@@ -348,6 +431,56 @@ class WormTrajectoryEnsemble:
 
     #  TODO: Implement
     #  __add__(), __radd__(), __iadd__(), __mul__(), __rmul__() and __imul__()
+
+    def __add__(self, other):
+        if isinstance(other, WormTrajectory):
+            return WormTrajectoryEnsemble(self + other)
+        elif isinstance(other, WormTrajectoryEnsemble):
+            return WormTrajectoryEnsemble(self + other._trajectories)
+        elif (isinstance(other, collections.Iterable) and
+              all([isinstance(t, WormTrajectoryEnsemble)
+                   for t in other])):
+            return WormTrajectoryEnsemble(self + other)
+        else:
+            raise ValueError('{0} is not a valid'.format(str(type(other))) +
+                             ' type to add to a WormTrajectoryEnsemble')
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __iadd__(self, other):
+        if isinstance(other, WormTrajectory):
+            self.append(other)
+        elif isinstance(other, WormTrajectoryEnsemble):
+            return self.extend(other._trajectories)
+        elif (isinstance(other, collections.Iterable) and
+              all([isinstance(t, WormTrajectory)
+                   for t in other])):
+            return self.extend(other)
+        else:
+            raise ValueError('{0} is not a valid'.format(str(type(other))) +
+                             ' type to add to a WormTrajectoryEnsemble')
+
+    def __isub__(self, other):
+        if isinstance(other, WormTrajectory):
+            self.remove(other)
+        elif isinstance(other, WormTrajectoryEnsemble):
+            for t in other:
+                self.remove(t)
+        elif (isinstance(other, collections.Iterable) and
+              all([isinstance(t, WormTrajectory)
+                   for t in other])):
+            for t in other:
+                self.remove(t)
+        else:
+            raise ValueError('{0} is not a valid'.format(str(type(other))) +
+                             ' type to remove from a WormTrajectoryEnsemble')
+
+    def __eq__(self, other):
+        return all([(traj in other) for traj in self])
+
+    def __ne__(self, other):
+        return any([(traj not in other) for traj in self])
 
     def __getitem__(self, key):
         return self._trajectories[key]
@@ -402,6 +535,12 @@ class WormTrajectoryEnsemble:
             key = lambda t: int(t.wormID)
         self._trajectories.sort(cmp=cmp, key=key)
 
+    def splitByStrain(self):
+        strains = set([traj.strain for traj in self])
+        return {strain: WormTrajectoryEnsemble([traj for traj in self
+                                                if traj.strain == strain])
+                for strain in strains}
+
     def readFirstFrameAll(self):
         for t in self:
             t.readFirstFrame()
@@ -434,6 +573,14 @@ class WormTrajectoryEnsemble:
             plotFunc(t)
             plt.title(self.nameFunc(t))
         plt.show()
+
+    def getMedianSpeed(self):
+        func = lambda t: np.array([ma.median(t.getMaskedCentroid(t.s))])
+        return self.ensembleAverage(func)
+
+    def getMeanSpeed(self):
+        func = lambda t: np.array([ma.mean(t.getMaskedCentroid(t.s))])
+        return self.ensembleAverage(func)
 
     def plotSpeedDistribution(self, color='k', showPlot=True):
         bins = np.linspace(0, 500, 200)
