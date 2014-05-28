@@ -132,7 +132,7 @@ class WormTrajectoryPostProcessor:
 
         # flip data appropriately
         sel = self.haveSkeleton and flipped
-        self.skeleton[sel, :, :] = np.flipud(np.squeeze(
+        self.skeleton[sel, :, :] = np.fliplr(np.squeeze(
             self.skeleton[sel, :, :]))
         self.posture[sel, :] = np.flipud(np.squeeze(self.posture[sel, :]))
 
