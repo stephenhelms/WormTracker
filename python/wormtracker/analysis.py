@@ -290,7 +290,7 @@ class WormTrajectory:
     def plotPosturalModeDistribution(self, color='k', showPlot=True):
         if self.Ctheta is None:
             return
-        plt.plot(self.ltheta/np.sum(self.ltheta), '.-', color=color,
+        plt.plot(np.cumsum(self.ltheta)/np.sum(self.ltheta), '.-', color=color,
                  label='{0} {1}'.format(self.strain, self.wormID))
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
@@ -435,8 +435,9 @@ class WormTrajectoryEnsemble:
             plt.title(self.nameFunc(t))
         plt.show()
 
-    def plotSpeedDistribution(self, color='k', showPlot=True):
-        bins = np.linspace(0, 500, 200)
+    def plotSpeedDistribution(self, bins=None, color='k', showPlot=True):
+        if bins is None:
+            bins = np.linspace(0, 500, 200)
         p, pl, pu = self.ensembleAverage(lambda x: x.getSpeedDistribution(bins)[0])
         centers = [(x1+x2)/2 for x1, x2 in pairwise(bins)]
         plt.plot(centers, p, '.-', color=color, label=self.name)
@@ -448,8 +449,9 @@ class WormTrajectoryEnsemble:
         if showPlot:
             plt.show()
 
-    def plotSpeedDistributions(self, showPlot=True):
-        bins = np.linspace(0, 500, 200)
+    def plotSpeedDistributions(self, bins=None, showPlot=True):
+        if bins is None:
+            bins = np.linspace(0, 500, 200)
         centers = [(x1+x2)/2 for x1, x2 in pairwise(bins)]
         for i, t in enumerate(self):
             color = plt.cm.jet(float(i)/float(len(self)-1))
@@ -514,7 +516,7 @@ class WormTrajectoryEnsemble:
     def plotPosturalModeDistribution(self, color='k', showPlot=True):
         if self.Ctheta is None:
             return
-        plt.plot(self.ltheta/np.sum(self.ltheta), '.-', color=color)
+        plt.plot(np.cumsum(self.ltheta)/np.sum(self.ltheta), '.-', color=color)
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
         plt.ylim((0, 1))
@@ -522,7 +524,7 @@ class WormTrajectoryEnsemble:
             plt.show()
 
     def plotAveragePosturalModeDistribution(self, color='k', showPlot=True):
-        l, ll, lu = self.ensembleAverage(lambda x: x.ltheta / np.sum(x.ltheta))
+        l, ll, lu = self.ensembleAverage(lambda x: np.cumsum(x.ltheta) / np.sum(x.ltheta))
         plt.plot(l, '.-', color=color)
         plt.hold(True)
         plt.fill_between(xrange(l.shape[0]), ll, lu,
@@ -648,12 +650,13 @@ class WormTrajectoryEnsembleGroup(object):
             plt.title(e.name)
         plt.show()
 
-    def plotSpeedDistribution(self, showPlot=True):
+    def plotSpeedDistribution(self, bins=None, showPlot=True):
         for ens in self:
             color = (self.colorScheme[ens]
                      if ens in self.colorScheme
                      else 'k')
-            ens.plotSpeedDistribution(color=color,
+            ens.plotSpeedDistribution(bins=bins,
+                                      color=color,
                                       showPlot=False)
         plt.legend()
         if showPlot:
