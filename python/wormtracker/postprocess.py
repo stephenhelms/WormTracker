@@ -175,9 +175,9 @@ class WormTrajectoryPostProcessor:
         X[self.badFrames, :] = ma.masked
         dt = 1/self.frameRate
         (v, s, phi) = _getMotionVariables(X, dt)
-        Xhead = np.squeeze(self.skeleton[:, 0, :])
+        Xhead = np.squeeze(self.skeleton[:, 0, :] - self.h5ref['midpoint'][...])
         Xhead[self.badFrames, :] = ma.masked
-        Xtail = np.squeeze(self.skeleton[:, -1, :])
+        Xtail = np.squeeze(self.skeleton[:, -1, :] - self.h5ref['midpoint'][...])
         Xtail[self.badFrames, :] = ma.masked
         for i, segment in enumerate(self.segments):
             # method 1: head leads during movement

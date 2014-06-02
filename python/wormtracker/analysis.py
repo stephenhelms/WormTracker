@@ -336,6 +336,7 @@ class WormTrajectoryStateImage:
         self.t = self.trajectory.t
         self.badFrames = self.trajectory.badFrames
         self.X = self.trajectory.getMaskedCentroid(self.trajectory.X)
+        self.Xhead = self.trajectory.getMaskedPosture(self.trajectory.Xhead)
         self.skeleton = ma.array(self.trajectory.skeleton[:, 1:-1, :])
         self.skeleton[~self.trajectory.orientationFixed, :, :] = ma.masked
         self.posture = self.trajectory.getMaskedPosture(self.trajectory.posture)
@@ -344,6 +345,11 @@ class WormTrajectoryStateImage:
 
     def initialView(self):
         self.axTraj = plt.subplot(1, 2, 1)
+        if self.trajectory.foodCircle is not None:
+            self.foodCircle = plt.Circle(self.trajectory.foodCircle[0:2],
+                                radius=self.trajectory.foodCircle[-1],
+                                color='r', fill=False)
+            plt.gca().add_patch(self.foodCircle)
         self.trajLine, = self.axTraj.plot([], [], 'k.')
         plt.hold(True)
         self.trajPoint, = self.axTraj.plot([], [], 'ro')
@@ -355,13 +361,18 @@ class WormTrajectoryStateImage:
 
         self.axWorm = plt.subplot(1, 2, 2)
         self.imWorm = self.axWorm.imshow(np.zeros((1, 1)), plt.gray(),
+                                         origin='lower',
                                          interpolation='none',
                                          vmin=0, vmax=255)
         plt.hold(True)
+        self.skelLine, = self.axWorm.plot([], [], 'c-')
         self.postureSkel = self.axWorm.scatter([], [], c=[],
                                                cmap=plt.get_cmap('PuOr'),
-                                               s=100)
+                                               s=100,
+                                               vmin=-3,
+                                               vmax=3)
         self.centroid, = self.axWorm.plot([], [], 'ro')
+        self.head, = self.axWorm.plot([], [], 'rs')
         plt.xticks([])
         plt.yticks([])
         #self.
@@ -378,30 +389,41 @@ class WormTrajectoryStateImage:
         self.imWorm.set_extent((0, im.shape[1], 0, im.shape[0]))
         bb = self.trajectory.h5ref['boundingBox'][frameNumber,
                                                   :2]
-        self.postureSkel.set_offsets(self.skeleton[frameNumber, :, :])
+        skel = self.trajectory.h5ref['skeleton'][frameNumber, :, :]
+        empty = np.all(skel == 0, axis=1)
+        self.skelLine.set_xdata(skel[~empty, 1])
+        self.skelLine.set_ydata(skel[~empty, 0])
+        self.postureSkel.set_offsets(np.fliplr(self.skeleton[frameNumber, :, :]))
         self.postureSkel.set_array(self.posture[frameNumber, :])
+        self.postureSkel.set_clim(-1, 1)
         self.postureSkel.set_cmap(plt.get_cmap('PuOr'))
-        self.centroid.set_xdata(self.X[frameNumber, 0]*self.pixelsPerMicron - bb[0])
-        self.centroid.set_ydata(self.X[frameNumber, 1]*self.pixelsPerMicron - bb[1])
+        self.centroid.set_xdata(self.X[frameNumber, 1]*self.pixelsPerMicron - bb[1])
+        self.centroid.set_ydata(self.X[frameNumber, 0]*self.pixelsPerMicron - bb[0])
+        self.head.set_xdata(self.Xhead[frameNumber, 1]*self.pixelsPerMicron - bb[1])
+        self.head.set_ydata(self.Xhead[frameNumber, 0]*self.pixelsPerMicron - bb[0])
+        plt.title(str(frameNumber/self.frameRate) + ' s')
 
     def getWormImage(self, frameNumber):
         if not self.badFrames[frameNumber]:
             bb = self.trajectory.h5ref['boundingBox'][frameNumber,
                                                       2:]
+            if all(bb == 0):
+                return np.zeros((100,100))
             im = self.trajectory.h5ref['grayWormImage'][frameNumber,
                                                         :bb[1],
                                                         :bb[0]]
             im = cv2.normalize(im, alpha=0, beta=255,
                                norm_type=cv2.NORM_MINMAX)
         else:
-            im = np.ones((1, 1))
+            im = np.zeros((100, 100))
         return im
 
     def getAnimation(self, frames=None, interval=None, figure=None):
         if figure is None:
             figure = plt.figure()
         if frames is None:
-            frames = xrange(self.t.shape[0])
+            good = (~self.badFrames).nonzero()[0]
+            frames = xrange(good[0], good[-1])
         if interval is None:
             interval = 1000/self.frameRate
         return animation.FuncAnimation(figure, self.plot,
@@ -717,7 +739,7 @@ class WormTrajectoryEnsembleGroup(object):
         self._ensembles = list(ensembles)
         self.name = name
         if colorScheme is None:
-            self.colorScheme = {ens: 'k' for ens in ensembles}
+            self.colorScheme = lambda e: 'k'
         else:
             self.colorScheme = colorScheme
 
@@ -799,9 +821,7 @@ class WormTrajectoryEnsembleGroup(object):
 
     def plotSpeedDistribution(self, bins=None, showPlot=True):
         for ens in self:
-            color = (self.colorScheme[ens]
-                     if ens in self.colorScheme
-                     else 'k')
+            color = self.colorScheme(ens)
             ens.plotSpeedDistribution(bins=bins,
                                       color=color,
                                       showPlot=False)
@@ -811,9 +831,7 @@ class WormTrajectoryEnsembleGroup(object):
 
     def plotSpeedAutocorrelation(self, showPlot=True):
         for ens in self:
-            color = (self.colorScheme[ens]
-                     if ens in self.colorScheme
-                     else 'k')
+            color = self.colorScheme(ens)
             ens.plotSpeedAutocorrelation(color=color,
                                          showPlot=False)
         plt.legend()
@@ -822,9 +840,7 @@ class WormTrajectoryEnsembleGroup(object):
 
     def plotMeanSquaredDisplacement(self, showPlot=True):
         for ens in self:
-            color = (self.colorScheme[ens]
-                     if ens in self.colorScheme
-                     else 'k')
+            color = self.colorScheme(ens)
             ens.plotMeanSquaredDisplacement(color=color,
                                             showPlot=False)
         plt.legend()
@@ -833,9 +849,7 @@ class WormTrajectoryEnsembleGroup(object):
 
     def plotPosturalModeDistribution(self, showPlot=True):
         for ens in self:
-            color = (self.colorScheme[ens]
-                     if ens in self.colorScheme
-                     else 'k')
+            color = self.colorScheme(ens)
             ens.plotAveragePosturalModeDistribution(color=color,
                                                     showPlot=False)
         plt.legend()
