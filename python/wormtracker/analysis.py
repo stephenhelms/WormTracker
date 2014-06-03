@@ -41,6 +41,29 @@ def bootstrap(array, nSamples=1000):
             np.percentile(mu, 97.5, axis=0))
 
 
+def KLDiv(P, Q):
+    if P.shape[0] != Q.shape[0]:
+        raise Exception()
+    if np.any(~np.isfinite(P)) or np.any(~np.isfinite(Q)):
+        raise Exception()
+    Q = Q / Q.sum()
+    P = P / P.sum(axis=0)
+    dist = np.sum(P*np.log2(P/Q), axis=0)
+    if np.isnan(dist):
+        dist = 0
+    return dist
+
+
+def JSDiv(P, Q):
+    if P.shape[0] != Q.shape[0]:
+        raise Exception()
+    Q = Q / Q.sum(axis=0)
+    P = P / P.sum(axis=0)
+    M = 0.5*(P+Q)
+    dist = 0.5*KLDiv(P,M) + 0.5*KLDiv(Q,M)
+    return dist
+
+
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = itertools.tee(iterable)
@@ -677,7 +700,7 @@ class WormTrajectoryEnsemble:
         plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
-        plt.xlim((np.min(tau), np.max(tau)))
+        plt.xlim((np.min(np.log10(tau)), np.max(np.log10(tau))))
         plt.grid(True)
         if showPlot:
             plt.show()
