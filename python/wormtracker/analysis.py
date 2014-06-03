@@ -767,7 +767,7 @@ class WormTrajectoryEnsembleGroup(object):
 
     def __getslice__(self, i, j):
         return WormTrajectoryEnsembleGroup(self._ensembles[i:j],
-                                           name=self.name+' Slice')
+                                           name=self.name)
 
     def __setslice__(self, i, j, sequence):
         self._ensembles[i:j] = sequence
