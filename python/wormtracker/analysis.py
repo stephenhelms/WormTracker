@@ -176,7 +176,7 @@ class WormTrajectory:
                                self.firstFrame.shape[0]/self.pixelsPerMicron))
             plt.hold(True)
         X = self.getMaskedCentroid(self.X)
-        plt.scatter(X[:, 0], X[:, 1], c=color, s=10)
+        plt.plot(X[:, 0], X[:, 1], '-', color=color)
         plt.hold(True)
         if self.foodCircle is not None:
             circle = plt.Circle(self.foodCircle[0:2],
