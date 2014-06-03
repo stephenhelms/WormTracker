@@ -12,6 +12,7 @@ import cv2
 import wormtracker.wormimageprocessor as wip
 import multiprocessing as multi
 from numba import jit
+import scipy.stats as ss
 
 
 def configureMatplotLibStyle():
@@ -206,13 +207,17 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
-    def getSpeedDistribution(self, bins=None):
+    def getSpeedDistribution(self, bins=None, useKernelDensity=True):
         if bins is None:
             bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
 
         s = self.getMaskedCentroid(self.s)
-        out = np.histogram(s.compressed(), bins,
-                           density=True)
+        if not useKernelDensity:
+            out = np.histogram(s.compressed(), bins,
+                               density=True)[0]
+        else:
+            kd = ss.gaussian_kde(self.getMaskedCentroid(self.s).compressed())
+            out = kd.evaluate(bins)
         return out
 
     def plotSpeedDistribution(self, bins=None, color='k', showPlot=True):
@@ -607,30 +612,30 @@ class WormTrajectoryEnsemble:
     def plotSpeedDistribution(self, bins=None, color='k', showPlot=True):
         if bins is None:
             bins = np.linspace(0, 500, 200)
-        p, pl, pu = self.ensembleAverage(lambda x: x.getSpeedDistribution(bins)[0])
-        centers = [(x1+x2)/2 for x1, x2 in pairwise(bins)]
-        plt.plot(centers, p, '.-', color=color, label=self.name)
+        p, pl, pu = self.ensembleAverage(lambda x: x.getSpeedDistribution(bins))
+        plt.plot(bins, p, '.-', color=color, label=self.name)
         plt.hold(True)
-        plt.fill_between(centers, pl, pu, facecolor=color, alpha=0.3)
+        plt.fill_between(bins, pl, pu, facecolor=color, alpha=0.3)
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.xlim([0,max(bins)])
+        plt.grid(True)
         if showPlot:
             plt.show()
 
     def plotSpeedDistributions(self, bins=None, showPlot=True):
         if bins is None:
             bins = np.linspace(0, 500, 200)
-        centers = [(x1+x2)/2 for x1, x2 in pairwise(bins)]
         for i, t in enumerate(self):
             color = plt.cm.jet(float(i)/float(len(self)-1))
             p = t.getSpeedDistribution(bins)[0]
-            plt.plot(centers,p,'.-',color=color,
+            plt.plot(bins,p,'.-',color=color,
                      label=self.nameFunc(t))
             plt.hold(True)
         plt.xlabel('Speed (um/s)')
         plt.ylabel('Probability')
         plt.xlim([0, max(bins)])
+        plt.grid(True)
         plt.legend()
         if showPlot:
             plt.show()
@@ -644,6 +649,7 @@ class WormTrajectoryEnsemble:
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
         plt.xlabel(r'$\tau (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.grid(True)
         # TODO: smart xlim
         if showPlot:
             plt.show()
@@ -657,6 +663,7 @@ class WormTrajectoryEnsemble:
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
         plt.xlabel(r'$\log \tau / (s)$')
         plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.grid(True)
         # TODO: smart xlim
         if showPlot:
             plt.show()
@@ -670,6 +677,8 @@ class WormTrajectoryEnsemble:
         plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+        plt.xlim((np.min(tau), np.max(tau)))
+        plt.grid(True)
         if showPlot:
             plt.show()
 
@@ -838,7 +847,9 @@ class WormTrajectoryEnsembleGroup(object):
         if showPlot:
             plt.show()
 
-    def plotMeanSquaredDisplacement(self, showPlot=True):
+    def plotMeanSquaredDisplacement(self, tau=None, showPlot=True):
+        if tau is None:
+            tau = np.logspace(-1,3,80)
         for ens in self:
             color = self.colorScheme(ens)
             ens.plotMeanSquaredDisplacement(color=color,
