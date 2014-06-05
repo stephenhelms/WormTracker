@@ -432,18 +432,16 @@ class WormTrajectoryStateImage:
         plt.title(str(frameNumber/self.frameRate) + ' s')
 
     def getWormImage(self, frameNumber):
-        if not self.badFrames[frameNumber]:
-            bb = self.trajectory.h5ref['boundingBox'][frameNumber,
-                                                      2:]
-            if all(bb == 0):
-                return np.zeros((100,100))
-            im = self.trajectory.h5ref['grayWormImage'][frameNumber,
-                                                        :bb[1],
-                                                        :bb[0]]
-            im = cv2.normalize(im, alpha=0, beta=255,
-                               norm_type=cv2.NORM_MINMAX)
-        else:
-            im = np.zeros((100, 100))
+        bb = self.trajectory.h5ref['boundingBox'][frameNumber,
+                                                  2:]
+
+        if all(bb == 0):
+            return np.zeros((100,100))
+        im = self.trajectory.h5ref['grayWormImage'][frameNumber,
+                                                    :bb[1],
+                                                    :bb[0]]
+        im = cv2.normalize(im, alpha=0, beta=255,
+                           norm_type=cv2.NORM_MINMAX)
         return im
 
     def getAnimation(self, frames=None, interval=None, figure=None):
