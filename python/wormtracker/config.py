@@ -36,7 +36,7 @@ def getVideoConfigDict(video):
         'wormDiskRadius': video.imageProcessor.wormDiskRadius,
         'expectedWormLength': video.imageProcessor.expectedWormLength,
         'expectedWormWidth': video.imageProcessor.expectedWormWidth,
-        'frameRate': video.imageProcessor.frameRate
+        'frameRate': video.imageProcessor.frameRate,
         'numberOfPosturePoints': video.imageProcessor.numberOfPosturePoints
     }
 
