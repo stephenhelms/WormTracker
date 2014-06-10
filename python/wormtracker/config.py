@@ -37,6 +37,7 @@ def getVideoConfigDict(video):
         'expectedWormLength': video.imageProcessor.expectedWormLength,
         'expectedWormWidth': video.imageProcessor.expectedWormWidth,
         'frameRate': video.imageProcessor.frameRate
+        'numberOfPosturePoints': video.imageProcessor.numberOfPosturePoints
     }
 
 
@@ -71,6 +72,7 @@ def loadWormVideos(f):
         video.imageProcessor.expectedWormLength = vs['expectedWormLength']
         video.imageProcessor.expectedWormWidth = vs['expectedWormWidth']
         video.imageProcessor.frameRate = vs['frameRate']
+        video.imageProcessor.numberOfPosturePoints = vs['numberOfPosturePoints']
 
         # create regions
         for region in videoC['regions']:
