@@ -5,7 +5,7 @@ from scipy import ndimage
 from scipy.ndimage import filters as nf
 import h5py
 import multiprocessing
-import numba
+#import numba
 
 """
 Black hat filter on a 6MP frame takes:
@@ -44,20 +44,19 @@ class WormImageProcessor:
     """
     Performs image processing tasks needed to find a worm in an image.
     """
-    frameRate = 11.5
-    expectedWormLength = 1000
-    expectedWormWidth = 50
-    numberOfPosturePoints = -1
-    holeAreaThreshold = 10
-    compactnessThreshold = 10
-    wormAreaThresholdRange = [0.5, 1.5]
-
     def __init__(self, pixelSize=0.05, threshold=0.9, backgroundDiskRadius=5,
                  wormDiskRadius=2):
         self.pixelSize = pixelSize
         self.threshold = threshold
         self.backgroundDiskRadius = backgroundDiskRadius
         self.wormDiskRadius = wormDiskRadius
+        self.frameRate = 11.5
+        self.expectedWormLength = 1000
+        self.expectedWormWidth = 50
+        self.numberOfPosturePoints = -1
+        self.holeAreaThreshold = 10
+        self.compactnessThreshold = 10
+        self.wormAreaThresholdRange = [0.5, 1.5]
 
     def autoWormConfiguration(self, wormImage):
         self.wormDiskRadius = round(wormImage.width/2.0*self.pixelSize)
@@ -174,7 +173,7 @@ class WormImageProcessor:
             g['frameRate'][...] = self.frameRate
 
 
-@numba.autojit()
+#@numba.autojit()
 def bwdiagfill(bwimage):
     """ clone of matlab's bwmorph(image,'diag') function? """
     # fills pixels matching the following neighborhoods:
@@ -197,7 +196,7 @@ def bwdiagfill(bwimage):
                                ndimage.binary_hit_or_miss(bwimage, hood))
     return output
 
-@numba.autojit()
+#@numba.autojit()
 def find1Cpixels(bwImage):
     """ identifies 1-connected pixels in image """
     # fills pixels matching the following neighborhoods:

@@ -19,18 +19,17 @@ libavPath = 'C:\\libav\\bin\\'
 
 
 class WormVideo:
-    imageProcessor = wp.WormImageProcessor()
-    firstFrame = None
-    pixelsPerMicron = None
-    regions = []
-    frameSize = None
-    nFrames = None
-
     def __init__(self, videoFile, storeFile='temp.h5',
                  videoInfoStorePath='/video',
                  resultsStorePath='/worms',
                  numberOfRegions=16, allSameStrain=True,
                  referenceDistance=25000):
+        self.imageProcessor = wp.WormImageProcessor()
+        self.firstFrame = None
+        self.pixelsPerMicron = None
+        self.regions = []
+        self.frameSize = None
+        self.nFrames = None
         self.videoFile = videoFile
         self.numberOfRegions = numberOfRegions
         self.allSameStrain = allSameStrain
@@ -312,14 +311,13 @@ def _videoProcessRegionParallel(region):
 class WormVideoRegion:
     """ Processes a region of a worm behavior experiment containing
         a single worm. """
-    frameRate = 11.5
-    frameSize = (2736, 2192)
-    foodCircle = None
-
     def __init__(self, videoFile, imageProcessor, resultsStoreFile,
                  cropRegion, pixelSize,
                  resultsStorePath='/worms', outputPrefix=None,
                  strainName='Unknown', wormName=''):
+        self.frameRate = 11.5
+        self.frameSize = (2736, 2192)
+        self.foodCircle = None
         self.videoFile = videoFile
         self.imageProcessor = imageProcessor
         self.resultsStoreFile = resultsStoreFile
@@ -464,28 +462,28 @@ class WormImage:
     centroidColor = 'r'
     midpointColor = 'r'
 
-    # image data and measurements
-    boundingBox = None
-    bwWormImage = None
-    grayWormImage = None
-    outlinedWormImage = None
-    skeletonizedWormImage = None
-    skeleton = None
-    skeletonSpline = None
-    centroid = None
-    midpoint = None
-    width = None
-    length = None
-    posture = None
-    meanBodyAngle = None
-    badSkeletonization = False
-    crossedWorm = False
-
     def __init__(self, videoRegion, grayFrame, bwFrame, wormContour):
         self.videoRegion = videoRegion
         self.grayFrame = grayFrame
         self.bwFrame = bwFrame
         self.wormContour = wormContour
+
+        # image data and measurements
+        self.boundingBox = None
+        self.bwWormImage = None
+        self.grayWormImage = None
+        self.outlinedWormImage = None
+        self.skeletonizedWormImage = None
+        self.skeleton = None
+        self.skeletonSpline = None
+        self.centroid = None
+        self.midpoint = None
+        self.width = None
+        self.length = None
+        self.posture = None
+        self.meanBodyAngle = None
+        self.badSkeletonization = False
+        self.crossedWorm = False
 
     def cropToWorm(self):
         """ crop filtered and thresholded frames to worm """
