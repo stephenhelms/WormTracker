@@ -1,5 +1,8 @@
 import cPickle
 import yaml
+# Change this to the directory where the code is stored
+import os
+os.chdir('D://Stephen/Documents/Code/wormtracker-matlab/python')
 import wormtracker as wt
 import wormtracker.config as wtc
 
