@@ -1,0 +1,89 @@
+###
+#
+# Install instructions for ia custom Python installation on LISA. 
+# Python 2.7.7 + modules and custom parallel (MPI enabled) hdf5 version. 
+# Modules: numpy scipy matplotlib yaml h5py skimage
+#
+# Piter T. de Boer 
+#
+
+
+#keep old values  
+export OLD_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+export OLD_PATH=$PATH
+export OLD_PYTHONPATH=$PYTHONPATH
+
+unset LD_LIBRARY_PATH
+unset PYTHONPATH
+
+###
+### Python 2.7(.7) from source
+###
+
+tar -zxvf Python-2.7.7.tgz
+cd Python-2.7.7
+./configure --prefix=$HOME/opt/python-2.7.7 
+
+make 
+make install 
+
+ln -s $HOME/opt/python-2.7.7 $HOME/opt/python-2.7
+
+PYTHON_INSTALL=$HOME/opt/python-2.7
+export PATH=$PYTHON_INSTALL/bin:$PATH
+export PYTHONPATH=$PYTHON_INSTALL/lib/python2.7/site-packages:$PYTHONPATH
+
+###
+### pip 
+### 
+
+wget https://bootstrap.pypa.io/get-pip.py
+python get-pip.py
+
+###
+### YAML 
+### 
+
+wget http://pyyaml.org/download/pyyaml/PyYAML-3.11.tar.gz
+tar -zxvf PyYAML-3.11.tar.gz
+
+###
+### Pyhton modules 
+###
+
+pip install numpy scipy 
+pip install matplotlib 
+pip install scikit-image
+
+###
+### hdf5-1.8.12 
+###
+#
+# note: hdf5-1.8.13 got errorz!
+# hdf5 with mpi, enable parallel and shared ! 
+
+tar -zxvf hdf5-1.8.12.tar.gz
+cd hdf5-1.8.12
+
+#enable MPI 
+
+module load mpich2/gnu/64
+./configure --prefix=$HOME/opt/hdf5-1.8.12/  --enable-parallel --enable-shared 
+
+make 
+make install 
+
+ln -s $HOME/opt/hdf5-1.8.12 $HOME/opt/hdf5-1.8    
+
+# don't forget: module load  mpich2/gnu/64 here: 
+# env vars: 
+export HDF5_INSTALL=$HOME/opt/hdf5-1.8
+export LDFLAGS="-L${HDF5_INSTALL}/lib"
+export  CFLAGS="-I${HDF5_INSTALL}/include"
+export PATH=$HDF5_INSTALL/bin:$PATH 
+LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH   
+
+pip install h5py
+
+# done 
+
