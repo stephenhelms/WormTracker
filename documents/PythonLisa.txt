@@ -1,6 +1,6 @@
 ###
 #
-# Install instructions for ia custom Python installation on LISA. 
+# Install instructions for a custom Python installation on LISA. 
 # Python 2.7.7 + modules and custom parallel (MPI enabled) hdf5 version. 
 # Modules: numpy scipy matplotlib yaml h5py skimage
 #
