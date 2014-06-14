@@ -13,6 +13,8 @@ import wormtracker.wormimageprocessor as wip
 import multiprocessing as multi
 from numba import jit
 import scipy.stats as ss
+from tsstats import *
+from stats import *
 
 
 def configureMatplotLibStyle():
@@ -27,75 +29,11 @@ def configureMatplotLibStyle():
     mpl.rcParams['legend.frameon'] = False
 
 
-def bootstrap(array, nSamples=1000):
-    nObserv, nVar = array.shape
-    mu = np.zeros((nSamples, nVar))
-    replaceIdx = np.random.randint(nObserv, size=(nSamples, 2))
-    for i, (iold, inew) in enumerate(replaceIdx):
-        resampled = array.copy()
-        resampled[iold, :] = resampled[inew, :]
-        mu[i, :] = np.mean(resampled, axis=0)
-
-    return (np.mean(mu, axis=0),
-            np.percentile(mu, 2.5, axis=0),
-            np.percentile(mu, 97.5, axis=0))
-
-
-def KLDiv(P, Q):
-    if P.shape[0] != Q.shape[0]:
-        raise Exception()
-    if np.any(~np.isfinite(P)) or np.any(~np.isfinite(Q)):
-        raise Exception()
-    Q = Q / Q.sum()
-    P = P / P.sum(axis=0)
-    dist = np.sum(P*np.log2(P/Q), axis=0)
-    if np.isnan(dist):
-        dist = 0
-    return dist
-
-
-def JSDiv(P, Q):
-    if P.shape[0] != Q.shape[0]:
-        raise Exception()
-    Q = Q / Q.sum(axis=0)
-    P = P / P.sum(axis=0)
-    M = 0.5*(P+Q)
-    dist = 0.5*KLDiv(P,M) + 0.5*KLDiv(Q,M)
-    return dist
-
-
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = itertools.tee(iterable)
     next(b, None)
     return itertools.izip(a, b)
-
-
-def acf(x, lags=500):
-    # from stackexchange
-    x = x - x.mean() # remove mean
-    if type(lags) is int:
-        lags = range(1, lags)
-
-    return ma.array([1] +
-                    [ma.corrcoef(x[:-i], x[i:])[0, 1]
-                     for i in lags])
-
-
-def circacf(x, lags=500):
-    if type(lags) is int:
-        lags = xrange(1, lags)
-
-    return np.array([1] +
-                    [np.mean(np.cos(x[lag:]-x[:-lag]))
-                     for lag in lags])
-
-
-def dotacf(x, lags=500):
-    if type(lags) is int:
-        lags = xrange(lags)
-    return [np.mean(np.vdot(x[l:, :], x[:-l, :]))
-            for l in lags]
 
 
 class WormTrajectory:
