@@ -56,7 +56,7 @@ class StochasticDifferentialEquation(object):
 
 
 class Fittable(object):
-    def fit(self, t, y):
+    def fit(t, y):
         raise NotImplemented()
 
 
@@ -118,12 +118,12 @@ class OrnsteinUhlenbeck(StochasticDifferentialEquation,
         """
         return np.exp(-tau / self.params['tau'])
 
-    def fit(self, t, y):
+    def fit(t, y):
         dts = t[1:] - t[:-1]
         dt = dts[0]
         if not np.all(dts - dt < 1e-12):
             raise Exception('Time must be evenly sampled.')
-        return self.fitAutoregressive(y, dt)
+        return OrnsteinUhlenbeck.fitAutoregressive(y, dt)
 
     def fitAutoregressive(y, dt):
         """
@@ -157,7 +157,7 @@ class DiffusionDrift(StochasticDifferentialEquation,
     def _ddStochFunc(self, D):
         return D
 
-    def fit(self, t, y):
+    def fit(t, y):
         dts = t[1:] - t[:-1]
         dt = dts[0]
         if not np.all(dts - dt < 1e-12):
