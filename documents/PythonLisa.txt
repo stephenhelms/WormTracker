@@ -47,8 +47,12 @@ python get-pip.py
 wget http://pyyaml.org/download/pyyaml/PyYAML-3.11.tar.gz
 tar -zxvf PyYAML-3.11.tar.gz
 
+cd PyYAML-3.11 
+
+python setup.py install 
+
 ###
-### Pyhton modules 
+### Python modules 
 ###
 
 pip install numpy scipy 
@@ -86,4 +90,15 @@ LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH
 pip install h5py
 
 # done 
+
+###
+### use environment: 
+###
+
+export PYTHON_INSTALL=$HOME/opt/python-2.7
+export PATH=$PYTHON_INSTALL/bin:$PATH
+export PYTHONPATH=$PYTHON_INSTALL/lib/python2.7/site-packages:$PYTHONPATH
+export HDF5_INSTALL=$HOME/opt/hdf5-1.8
+export PATH=$HDF5_INSTALL/bin:$PATH 
+export LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH   
 
