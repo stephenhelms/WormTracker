@@ -15,11 +15,21 @@ import sys
 import argparse
 import cPickle
 import yaml
+import time 
+
 # Change this to the directory where the code is stored
 import wormtracker as wt
 import wormtracker.config as wtc
 import wormtracker.parallel as wtp
+from wormtracker import Logger
 
+def timeStr(time):
+    ss=(time%60)
+    time=time/60 
+    mm=(time%60)
+    time=time/60
+    hh=time%24; 
+    return "{:0=2.0f}:{:0=2.0f}:{:0=2.0f}".format(hh,mm,ss); 
 
 def main(argv):
     # parse input arguments
@@ -28,12 +38,24 @@ def main(argv):
                         help="the input YAML configuration file")
     args = parser.parse_args()
 
+    batchStart = time.clock()
+        
+    Logger.logPrint("Starting batchprocess: "+args.input); 
+    Logger.logPrint("Start time:"+timeStr(batchStart)); 
+     
     # load WormVideo to YAML configuration file
     with open(args.input, 'r') as f:
         wvs = wtc.loadWormVideos(f)
 
-    # run analysis on region
+    # run analysis on regions
     wtp.batchProcessVideos(wvs)
+    batchStop  = time.clock()
+    Logger.logPrint("Start time:"+timeStr(batchStart)); 
+    Logger.logPrint("End time  :"+timeStr(batchStop)); 
+    Logger.logPrint("Total time:"+timeStr(batchStop-batchStart)); 
+    
+    # wv=wvs[0]
+    #wtp.processRegion(wv.regions[0])
 
     return 'Success'
 
