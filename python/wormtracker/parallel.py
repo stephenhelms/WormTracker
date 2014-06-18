@@ -90,8 +90,8 @@ def cleanUpPostProcess(wormVideo):
             #update 
             cmd=[arg.format(name,region.strainName,region.wormName) for arg in args] 
 
-        print 'Executing:',' '.join(cmd)
-        print check_output(cmd)
+            print 'Executing:',' '.join(cmd)
+            print check_output(cmd)
         
     except(Exception) as e:
         print 'Error cleaning up:'
