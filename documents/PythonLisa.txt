@@ -91,16 +91,54 @@ LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH
 
 pip install h5py
 
-# done 
+###
+### OpenCV-2.4 
+###
+
+# get source 
+git clone https://github.com/Itseez/opencv.git opencv-src
+cd opencv-src 
+
+git checkout --track origin/2.4
+
+mkdir release-2.4
+cd release-2.4 
+
+# configure+install 
+
+# disable default environment on LISA: 
+unset LD_LIBRARY_PATH
+export PATH=/bin:/usr/bin:/usr/bin/X11:/usr/local/bin
+module load qt/4.8.2
+
+#use my environment: 
+PYTHON_INSTALL=$HOME/opt/python-2.7
+export PATH=$PYTHON_INSTALL/bin:$PATH
+export PYTHONPATH=$PYTHON_INSTALL/lib/python2.7/site-packages:$PYTHONPATH
+
+#cmake:  
+cmake -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=$HOME/opt/opencv-2.4 -D BUILD_ZLIB=ON -D BUILD_PYTHON_SUPPORT=ON ..
+
+make
+make install
+cd ../.. 
+
+echo done
 
 ###
-### use environment: 
+### use complete environment: 
 ###
 
 export PYTHON_INSTALL=$HOME/opt/python-2.7
 export PATH=$PYTHON_INSTALL/bin:$PATH
 export PYTHONPATH=$PYTHON_INSTALL/lib/python2.7/site-packages:$PYTHONPATH
-export HDF5_INSTALL=$HOME/opt/hdf5-1.8
-export PATH=$HDF5_INSTALL/bin:$PATH 
-export LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH   
 
+export HDF5_INSTALL=$HOME/opt/hdf5-1.8
+export LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH   
+export PATH=$HDF5_INSTALL/bin:$PATH 
+
+export OPENCV_INSTALLL=$HOME/opt/opencv-2.4
+export PYTHONPATH=$OPENCV_INSTALLL/lib/python2.7/dist-packages:$PYTHONPATH
+
+
+ 
