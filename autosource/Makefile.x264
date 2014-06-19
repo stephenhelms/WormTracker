@@ -1,0 +1,85 @@
+###
+#
+# Makefile which compiles and installs x264 codec from source tarball into /opt/av/codecs 
+#
+
+###
+# Sources 
+
+X264_BZ2	=x264-last_stable_20140424.tar.bz2
+X264_DEV	=x264-dev
+
+### 
+# Install directories 
+
+INSTALL 	= /opt/av
+CODECS_INSTALL 	= /opt/av/codecs
+X264_INSTALL	= ${CODECS_INSTALL}
+
+###
+# options 
+
+# not all configure scripts support ARCH 
+ARCH=x86_64
+# enable both shared and static. 
+#--enabe-shared --enable-static 
+###
+# Derived 
+# 
+
+###
+
+all: mkdirs x264
+
+.PHONY : x264 
+
+x264: mkdirs  x264-install
+
+mkdirs:
+	mkdir -p /opt/av
+	mkdir -p /opt/av/codecs
+
+###
+### x264
+### 
+
+X264_INSTALL_BIN=${X264_INSTALL}/bin/x264
+
+${X264_INSTALL_BIN}-exists:
+	@if [ -f "${X264_INSTALL_BIN}" ] ;  then echo "- x264 installed in ${X264_INSTALL_BIN} " ; else echo " - x264 NOT installed in ${X264_INSTALL_BIN}" ;fi
+
+ 
+# bunzip into 'x264-dev' 
+
+${X264_DEV}/configure: ${X264_BZ2} 
+	mkdir -p ${X264_DEV} 
+	bunzip2 -c ${X264_BZ2} | tar -xvo -C ${X264_DEV} --strip-components 1 
+	# touch to indicate checkout ! 
+	touch ${X264_DEV}/configure
+
+# configure and create config.mak
+
+${X264_DEV}/config.mak: ${X264_DEV}/configure
+	(cd ${X264_DEV} &&  ./configure --prefix=${CODECS_INSTALL}  --enable-shared --enable-static  ) 
+
+# build
+
+${X264_DEV}/x264: ${X264_DEV}/config.mak
+	(cd ${X264_DEV} &&  make) 
+
+x264-build: ${X264_DEV}/x264
+
+
+# install 
+
+${X264_INSTALL_BIN}: ${X264_INSTALL_BIN}-exists ${X264_DEV}/x264
+	(cd ${X264_DEV} &&  make install) 
+
+x264-install: ${X264_INSTALL_BIN}
+
+###
+### Clean
+###
+
+clean:
+	rm -rf ${X264_DEV} 
