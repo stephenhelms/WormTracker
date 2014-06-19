@@ -129,13 +129,14 @@ echo done
 ### use complete environment: 
 ###
 
+# add following to for example your ~/.profile file: 
+
 export PYTHON_INSTALL=$HOME/opt/python-2.7
 export PATH=$PYTHON_INSTALL/bin:$PATH
-export PYTHONPATH=$PYTHON_INSTALL/lib/python2.7/site-packages:$PYTHONPATH
 
 export HDF5_INSTALL=$HOME/opt/hdf5-1.8
 export LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH   
-export PATH=$HDF5_INSTALL/bin:$PATH 
+export PATH=$HDF5_INSTALL/bin:$PATH
 
 export OPENCV_INSTALLL=$HOME/opt/opencv-2.4
 export PYTHONPATH=$OPENCV_INSTALLL/lib/python2.7/dist-packages:$PYTHONPATH
