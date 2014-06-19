@@ -138,8 +138,8 @@ export HDF5_INSTALL=$HOME/opt/hdf5-1.8
 export LD_LIBRARY_PATH=$HDF5_INSTALL/lib:$LD_LIBRARY_PATH   
 export PATH=$HDF5_INSTALL/bin:$PATH
 
-export OPENCV_INSTALLL=$HOME/opt/opencv-2.4
-export PYTHONPATH=$OPENCV_INSTALLL/lib/python2.7/dist-packages:$PYTHONPATH
+export OPENCV_INSTALL=$HOME/opt/opencv-2.4
+export PYTHONPATH=$OPENCV_INSTALL/lib/python2.7/dist-packages:$PYTHONPATH
 
 
  
