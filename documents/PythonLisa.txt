@@ -58,7 +58,7 @@ tar -zxvf PyYAML-3.11.tar.gz
 
 cd PyYAML-3.11 
 python setup.py install 
-cd.. 
+cd .. 
 
 ###
 ### hdf5-1.8.12 
