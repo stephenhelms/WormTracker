@@ -91,8 +91,8 @@ def cleanUpPostProcess(wormVideo):
             #update 
             cmd=[arg.format(name,region.strainName,region.wormName) for arg in args] 
 
-        Logger.logPrint('Executing:'+' '.join(cmd))
-        Logger.logPrint('Output:'+check_output(cmd))
+            Logger.logPrint('Executing:'+' '.join(cmd))
+            Logger.logPrint('Output:'+check_output(cmd))
         
     except(Exception) as e:
         Logger.logPrint('Error cleaning up:')
