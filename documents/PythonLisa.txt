@@ -16,6 +16,7 @@ export OLD_PYTHONPATH=$PYTHONPATH
 unset LD_LIBRARY_PATH
 unset PYTHONPATH
 
+
 ###
 ### Python 2.7(.7) from source
 ###
@@ -41,17 +42,6 @@ wget https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
 
 ###
-### YAML 
-### 
-
-wget http://pyyaml.org/download/pyyaml/PyYAML-3.11.tar.gz
-tar -zxvf PyYAML-3.11.tar.gz
-
-cd PyYAML-3.11 
-
-python setup.py install 
-
-###
 ### Python modules 
 ###
 
@@ -60,26 +50,38 @@ pip install matplotlib
 pip install scikit-image
 
 ###
+### YAML 
+### 
+
+wget http://pyyaml.org/download/pyyaml/PyYAML-3.11.tar.gz
+tar -zxvf PyYAML-3.11.tar.gz
+
+cd PyYAML-3.11 
+python setup.py install 
+cd.. 
+
+###
 ### hdf5-1.8.12 
 ###
 #
-# note: hdf5-1.8.13 got errorz!
+# note: hdf5-1.8.13 got errors!
 # hdf5 with mpi, enable parallel and shared ! 
 
+wget http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8.12/src/hdf5-1.8.12.tar.gz
 tar -zxvf hdf5-1.8.12.tar.gz
 cd hdf5-1.8.12
 
 #enable MPI 
-
 module load mpich2/gnu/64
 ./configure --prefix=$HOME/opt/hdf5-1.8.12/  --enable-parallel --enable-shared 
 
 make 
 make install 
+cd .. 
 
 ln -s $HOME/opt/hdf5-1.8.12 $HOME/opt/hdf5-1.8    
 
-# don't forget: module load  mpich2/gnu/64 here: 
+# don't forget: module load  mpich2/gnu/64 here when performing rebuild: 
 # env vars: 
 export HDF5_INSTALL=$HOME/opt/hdf5-1.8
 export LDFLAGS="-L${HDF5_INSTALL}/lib"
