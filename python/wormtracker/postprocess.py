@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.ma as ma
 from numpy import linalg as LA
-from numba import jit
+#from numba import jit
 
 
 class WormTrajectoryPostProcessor:
@@ -95,7 +95,7 @@ class WormTrajectoryPostProcessor:
         self.haveSkeleton = [np.any(skeleton > 0)
                              for skeleton in self.skeleton]
 
-    @jit
+    # @jit
     def skeletonDist(skeleton1, skeleton2):
         distEachPoint = np.sqrt(np.sum(np.power(skeleton1 -
                                                 skeleton2, 2),

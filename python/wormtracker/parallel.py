@@ -71,22 +71,28 @@ def cleanUpPostProcess(wormVideo):
     try:
         # copy video info
         print 'Merging HDF5 output files...'
-        obj = '\"/video\"'
-        c = [hdf5path + 'h5copy', '-i', os.path.join(path, name), '-o',
-             outputFile, '-s', obj, '-d', obj, '-p']
-        print check_output(' '.join(c))
+        obj = '/video'
 
-        # copy region files
-        cmds = [' '.join([hdf5path + 'h5copy', '-i', os.path.join(path,
-                                                                  '{1}_{2}_{0}'),
+        # Linux: create command, do no escape argument values and keep arguments as separated argument list: 
+
+        cmd = [hdf5path + 'h5copy', '-i', os.path.join(path, name), '-o',
+             outputFile, '-s', obj, '-d', obj, '-p']
+        
+        print 'Executing:',' '.join(cmd)
+        print check_output(cmd);
+         
+        for region in wormVideo.regions:
+            
+            args = [hdf5path + 'h5copy', '-i', os.path.join(path,'{1}_{2}_{0}'),
                           '-o', os.path.join(path, 'merge_{0}'), '-s',
-                          '\"/worms/{1}/{2}\"','-d', '\"/worms/{1}/{2}\"',
-                          '-p']).format(name,
-                                        region.strainName,
-                                        region.wormName)
-                for region in wormVideo.regions]
-        for c in cmds:
-            print check_output(c)
+                          '/worms/{1}/{2}','-d', '/worms/{1}/{2}',
+                          '-p']
+            #update 
+            cmd=[arg.format(name,region.strainName,region.wormName) for arg in args] 
+
+        print 'Executing:',' '.join(cmd)
+        print check_output(cmd)
+        
     except(Exception) as e:
         print 'Error cleaning up:'
         print e
