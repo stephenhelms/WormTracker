@@ -7,10 +7,10 @@ import glob
 
 env.hosts = ['lisa.surfsara.nl']
 
-code_dir = '$HOME/code/WormTracker/python'
-work_dir = '~/worms'
-video_dir = '~/worms/video'
-out_dir = '~/worms/out'
+code_dir = '$HOME/code/WormTracker/python/'
+work_dir = '~/worms/'
+video_dir = '~/worms/videos/'
+out_dir = '~/worms/out/'
 
 
 def multistage(configPath):
@@ -29,7 +29,7 @@ def stage(config):
         for v in cf['videos']:
             sf = v['videoSettings']['storeFile']
             sf = os.path.split(sf)[1]  # remove any directory prefix
-            sf = os.path.join(out_dir, sf)  # prepend the output directory
+            sf = out_dir + sf  # prepend the output directory
             v['videoSettings']['storeFile'] = sf
 
             vf = v['videoSettings']['videoFile']
@@ -37,7 +37,7 @@ def stage(config):
             # copy video to server
             print put(vf, video_dir)
             vf = os.path.split(vf)[1]  # remove any directory prefix
-            vf = os.path.join(video_dir, vf)  # prepend the video directory
+            vf = video_dir + vf  # prepend the video directory
             print 'Remote video file: ' + vf
             v['videoSettings']['videoFile'] = vf
         configName = os.path.split(config)[1]
