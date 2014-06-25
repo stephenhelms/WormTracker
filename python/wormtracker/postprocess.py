@@ -2,7 +2,7 @@ import numpy as np
 import numpy.ma as ma
 from numpy import linalg as LA
 #from numba import jit
-
+from wormtracker import Logger
 
 class WormTrajectoryPostProcessor:
     # bad frame settings
@@ -54,21 +54,21 @@ class WormTrajectoryPostProcessor:
         self.vtheta = None
 
     def postProcess(self):
-        print 'Identifying bad frames...'
+        Logger.logPrint( 'Identifying bad frames...')
         self.identifyBadFrames()
-        print 'Extracting postural data...'
+        Logger.logPrint( 'Extracting postural data...')
         self.extractPosturalData()
-        print 'Fixing order of postural data...'
+        Logger.logPrint( 'Fixing order of postural data...')
         self.fixPosturalOrdering()
-        print 'Segmenting trajectory...'
+        Logger.logPrint( 'Segmenting trajectory...')
         self.segment()
-        print 'Assigning head...'
+        Logger.logPrint( 'Assigning head...')
         self.assignHeadTail()
-        print 'Ordering postural data head to tail...'
+        Logger.logPrint( 'Ordering postural data head to tail...')
         self.orderHeadTail()
-        print 'Calculating centroid motion variables...'
+        Logger.logPrint( 'Calculating centroid motion variables...')
         self.calculateCentroidMeasurements()
-        print 'Calculate postural measurements...'
+        Logger.logPrint( 'Calculate postural measurements...')
         self.calculatePosturalMeasurements()
 
     def identifyBadFrames(self):
@@ -96,6 +96,7 @@ class WormTrajectoryPostProcessor:
                              for skeleton in self.skeleton]
 
     # @jit
+    @staticmethod 
     def skeletonDist(skeleton1, skeleton2):
         distEachPoint = np.sqrt(np.sum(np.power(skeleton1 -
                                                 skeleton2, 2),

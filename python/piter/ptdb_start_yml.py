@@ -10,7 +10,7 @@ wtp.hdf5path = ''
 wt.libavPath = ''
 
 #pickleFile = '/home/ptdeboer/worms/videos/n2_day7_short_test_pdb.dat'
-configFile = '/home/ptdeboer/worms/worms_config1.yml'
+configFile = '/home/ptdeboer/worms/config.yml'
 
 # load pickled WormVideo
 #with open(pickleFile, 'rb') as f:
@@ -27,7 +27,7 @@ with open(configFile, 'r') as f:
     wvs = wtc.loadWormVideos(f)
 
 # run analysis on region
-#wtp.batchProcessVideos(wvs)
+wtp.batchProcessVideos(wvs)
     
 #os.chdir("/home/ptdeboer/worms/out")
  
@@ -35,8 +35,8 @@ with open(configFile, 'r') as f:
 # wtp.batchProcessVideos(wvs);
 #single 
 
-wv=wvs[0];
-wtp.processRegion(wv.regions[0]); 
+#wv=wvs[0];
+#wtp.processRegion(wv.regions[0]); 
 
 # wvs[0] should be equivalent to the original wv object
 

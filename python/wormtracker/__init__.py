@@ -17,11 +17,19 @@ import multiprocessing
 
 libavPath = 'C:\\libav\\bin\\'
 
-
+class Logger: 
+    @staticmethod
+    def logPrint (line):
+        #if hasattr(os, 'getppid'):  # only available on Unix
+        #    parentPid=os.getppid()
+        pid=os.getpid()
+        print '['+str(pid)+']:'+line 
+        
 class WormVideo:
     def __init__(self, videoFile, storeFile='temp.h5',
                  videoInfoStorePath='/video',
                  resultsStorePath='/worms',
+                 logFile='temp.log',
                  numberOfRegions=16, allSameStrain=True,
                  referenceDistance=25000):
         self.imageProcessor = wp.WormImageProcessor()
@@ -31,12 +39,14 @@ class WormVideo:
         self.frameSize = None
         self.nFrames = None
         self.videoFile = videoFile
+        self.logFile=videoFile+'_.log'
         self.numberOfRegions = numberOfRegions
         self.allSameStrain = allSameStrain
         self.referenceDistance = referenceDistance
         self.storeFile = storeFile
         self.videoInfoStorePath = videoInfoStorePath
         self.resultsStorePath = resultsStorePath
+
 
     def readFirstFrame(self, askForFrameRate=True):
         video = cv2.VideoCapture()
@@ -49,10 +59,10 @@ class WormVideo:
                 self.firstFrame = firstFrameChannels[0]
                 self.frameSize = self.firstFrame.shape
                 self.nFrames = int(video.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
-                print 'Video has ' + str(self.nFrames) + ' frames.'
+                Logger.logPrint('Video has ' + str(self.nFrames) + ' frames.')
                 if askForFrameRate:
                     frameRate = video.get(cv2.cv.CV_CAP_PROP_FPS)
-                    print 'Video reports ' + str(frameRate) + ' fps.'
+                    Logger.logPrint('Video reports ' + str(frameRate) + ' fps.')
                     self.imageProcessor.frameRate = \
                         float(raw_input('Enter correct frame rate:'))
 
@@ -153,8 +163,7 @@ class WormVideo:
         self.imageProcessor.pixelSize = (sel.distance() /
                                          self.referenceDistance)
         self.imageProcessor.determineNumberOfPosturePoints()
-        print ("The pixel size is " + str(1.0/self.imageProcessor.pixelSize) +
-               " um/px.")
+        WormVideo.logPrint("The pixel size is " + str(1.0/self.imageProcessor.pixelSize) + " um/px.")
 
     def defineFoodRegions(self):
         if self.firstFrame is None:
@@ -227,9 +236,9 @@ class WormVideo:
                         wormImage.measureWorm()
                         wormImage.plot(bodyPtMarkerSize=30)
                     except(Exception) as e:
-                        print 'Error in {0} {1}: {2}'.format(region.strainName,
-                                                             region.wormName,
-                                                             str(e))
+                        Logger.logPrint('Error in {0} {1}: {2}'.format(region.strainName,
+                                                             region.wormName+':'+
+                                                             str(e)))
             plt.title(region.strainName + ' ' + region.wormName)
         plt.show()
 
@@ -261,14 +270,14 @@ class WormVideo:
 
     def processRegions(self):
         self.saveConfiguration()
-        print 'Processing regions of video...'
+        Logger.logPrint('Processing regions of video...');
         for i, region in enumerate(self.regions):
-            print 'Processing region ' + str(i) + ' of ' + str(len(self.regions))
+            Logger.logPrint('Processing region ' + str(i) + ' of ' + str(len(self.regions)))
             tStart = time.clock()
             region.process()
             tStop = time.clock()
             tDuration = (tStop - tStart) / 60.0
-            print 'Analysis of region took ' + str(tDuration) + ' min.'
+            Logger.logPrint('Analysis of region took ' + str(tDuration) + ' min.')
 
     def processRegionsParallel(self):
         self.saveConfiguration()
@@ -293,13 +302,13 @@ class WormVideo:
 
         #while any(not job.ready() for job in jobs) and not queue.empty():
         #    if not queue.empty():
-        #        print queue.get()
+        #        logPrint queue.get()
         #    time.sleep(1)
 
-        print result.get()
+        Logger.logPrint(result.get())
         pool.close()
         pool.join()
-        print 'Finished analyzing all regions'
+        Logger.logPrint('Finished analyzing all regions')
         # TODO: merge the output files
 
 _queue = multiprocessing.Queue()
@@ -343,8 +352,8 @@ class WormVideoRegion:
                 self.processFrame(framev, ii)
                 tStop = time.clock()
                 tDuration = (tStop - tStart)
-                print '\rProcessing frame {0} of {1} took {2} s.'.format(
-                    str(ii+1), str(self.nFrames), str(tDuration)),
+                Logger.logPrint('Processing frame {0} of {1} took {2} s.'.format(
+                    str(ii+1), str(self.nFrames), str(tDuration)))
                 # read next video frame
                 success, frame = video.read()
                 ii = ii+1
@@ -386,8 +395,8 @@ class WormVideoRegion:
                 worm.store(self.resultsStoreFile,
                            pre, idx)
             except(Exception) as e:
-                print 'Error in {0} {1} frame {2} analyzing worm.'.format(
-                    self.strainName, self.wormName, str(idx))
+                Logger.logPrint('Error in {0} {1} frame {2} analyzing worm.'.format(
+                    self.strainName, self.wormName, str(idx)))
 
     def measureWorm(self, grayFrame, bwFrame, wormContour):
         worm = WormImage(self, grayFrame, bwFrame, wormContour)

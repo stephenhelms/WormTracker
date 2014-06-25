@@ -1,0 +1,87 @@
+###
+#
+# Makefile which compiles and installs x265 codec from source tarball into /opt/av/codecs 
+#
+
+###
+# Sources 
+
+X265_BZ2	=x265-source_master_20140424.tar.bz2
+X265_DEV	=x265-dev
+
+### 
+# Install directories 
+
+INSTALL 	= /opt/av
+CODECS_INSTALL 	= /opt/av/codecs
+X265_INSTALL	= ${CODECS_INSTALL}
+
+###
+# options 
+
+# not all configure scripts support ARCH 
+ARCH=x86_64
+# enable both shared and static. 
+#--enabe-shared --enable-static 
+###
+# Derived 
+# 
+
+###
+
+all: mkdirs x265
+
+.PHONY : x265
+
+x265: mkdirs  x265-install 
+
+mkdirs:
+	mkdir -p /opt/av
+	mkdir -p /opt/av/codecs
+
+###
+### x265
+### 
+
+# checkout: 
+
+X265_MAKE_MAKEFILES		= ${X265_DEV}/build/linux/make-Makefiles.bash
+X265_CMAKE_CACHE		= ${X265_DEV}/build/linux/CMakeCache.txt
+X265_BUILD_X265			= ${X265_DEV}/build/linux/x265
+X265_INSTALL_BIN		= ${X265_INSTALL}/bin/x265
+
+${X265_MAKE_MAKEFILES}: ${X265_BZ2}
+	mkdir -p ${X265_DEV} 
+	bunzip2 -c ${X265_BZ2} | tar -xvo -C ${X265_DEV} --strip-components 1
+	touch $@
+
+x265-checkout: ${X265_MAKE_MAKEFILES}
+
+# configure 
+
+${X265_CMAKE_CACHE}: ${X265_MAKE_MAKEFILES} 
+	( cd ${X265_DEV}/build/linux && ./make-Makefiles.bash ) 
+	( cd ${X265_DEV}/build/linux && cmake -DCMAKE_INSTALL_PREFIX:PATH=${X265_INSTALL} -DENABLE_SHARED=YES . ) 
+
+# build: 
+
+
+${X265_BUILD_X265}: ${X265_CMAKE_CACHE} 
+	( cd ${X265_DEV}/build/linux && make )  
+
+x265-build: ${X265_BUILD_X265}
+
+#install 
+
+${X265_INSTALL_BIN}: ${X265_BUILD_X265} 
+	( cd ${X265_DEV}/build/linux && make install) 
+
+x265-install: ${X265_INSTALL_BIN}
+
+
+###
+### Clean
+###
+
+clean:
+	rm -rf ${X265_DEV} 
