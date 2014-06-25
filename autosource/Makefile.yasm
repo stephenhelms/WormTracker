@@ -1,0 +1,72 @@
+###
+#
+# YASM build and install Makefile (for 1.2.0)  
+# Only needed for older Ubuntu versions (<=12.04) 
+
+###
+# Sources 
+
+YASM_TGZ	=yasm-1.2.0.tar.gz 
+YASM_DEV	=yasm-1.2.0-dev
+
+### 
+# Install directories 
+
+YASM_INSTALL	=/opt/yasm-1.2.0
+
+all: mkdirs yasm
+
+.PHONY : yasm 
+
+yasm: mkdirs  yasm-install
+
+mkdirs:
+	mkdir -p ${YASM_INSTALL} 
+
+info: 
+	@echo YASM_INSTALL     = ${YASM_INSTALL}
+	@echo YASM_INSTALL_BIN = ${YASM_INSTALL_BIN}
+###
+### yasm
+### 
+
+YASM_INSTALL_BIN=${YASM_INSTALL}/bin/yasm
+
+${YASM_INSTALL_BIN}-exists:
+	@if [ -f "${YASM_INSTALL_BIN}" ] ;  then echo "- yasm installed in ${YASM_INSTALL_BIN} " ; else echo " - yasm NOT installed in ${YASM_INSTALL_BIN}" ;fi
+
+ 
+# untar into 'yasm-dev' 
+
+${YASM_DEV}/configure: ${YASM_TGZ}
+	mkdir -p ${YASM_DEV} 
+	tar -zxvf ${YASM_TGZ} -C ${YASM_DEV} --strip-components 1 
+	# touch to indicate checkout ! 
+	touch ${YASM_DEV}/configure
+
+# configure and create config.mak
+
+${YASM_DEV}/config.h: ${YASM_DEV}/configure
+	(cd ${YASM_DEV} &&  ./configure --prefix=${YASM_INSTALL} ) 
+
+yasm-configure: ${YASM_DEV}/config.h
+
+# build
+
+${YASM_DEV}/yasm: ${YASM_DEV}/config.h
+	(cd ${YASM_DEV} &&  make) 
+
+yasm-build: ${YASM_DEV}/yasm
+
+
+# install 
+
+${YASM_INSTALL_BIN}: ${YASM_INSTALL_BIN}-exists ${YASM_DEV}/yasm
+	(cd ${YASM_DEV} &&  make install) 
+
+yasm-install: ${YASM_INSTALL_BIN}
+
+###
+
+clean:
+	rm -rf ${YASM_DEV} 
