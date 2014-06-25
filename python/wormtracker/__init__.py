@@ -341,6 +341,7 @@ class WormVideoRegion:
 
     def process(self):
         """ Processes the video region. """
+        self.saveConfiguration()
         video = cv2.VideoCapture()
         ii = 0  # frame counter
         if video.open(self.videoFile):
