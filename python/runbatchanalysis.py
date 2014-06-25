@@ -38,7 +38,7 @@ def main(argv):
                         help="the input YAML configuration file")
     args = parser.parse_args()
 
-    batchStart = time.clock()
+    batchStart = time.time()
         
     Logger.logPrint("Starting batchprocess: "+args.input); 
     Logger.logPrint("Start time:"+timeStr(batchStart)); 
@@ -49,7 +49,7 @@ def main(argv):
 
     # run analysis on regions
     wtp.batchProcessVideos(wvs)
-    batchStop  = time.clock()
+    batchStop  = time.time()
     Logger.logPrint("Start time:"+timeStr(batchStart)); 
     Logger.logPrint("End time  :"+timeStr(batchStop)); 
     Logger.logPrint("Total time:"+timeStr(batchStop-batchStart)); 
