@@ -10,7 +10,7 @@ env.hosts = ['lisa.surfsara.nl']
 code_dir = '$HOME/code/WormTracker/python/'
 work_dir = '~/worms/'
 video_dir = '~/worms/videos/'
-out_dir = '~/worms/out/'
+out_dir = 'out/'
 
 
 def multistage(configPath):
@@ -37,8 +37,6 @@ def stage(config):
             # copy video to server
             print put(vf, video_dir)
             vf = os.path.split(vf)[1]  # remove any directory prefix
-            vf = video_dir + vf  # prepend the video directory
-            print 'Remote video file: ' + vf
             v['videoSettings']['videoFile'] = vf
         configName = os.path.split(config)[1]
         lisaName = os.path.join(tempfile.mkdtemp(), configName)
