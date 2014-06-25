@@ -431,28 +431,30 @@ class WormVideoRegion:
                 g.create_dataset('boundingBox', (n, 4), dtype='int32')
                 g.create_dataset('bwWormImage', (n, 150, 150),
                                  maxshape=(n, None, None),
-                                 chunks=(19,19,1),
+                                 chunks=(1,19,19),
                                  compression='gzip', dtype='b')
                 g.create_dataset('grayWormImage', (n, 150, 150),
                                  maxshape=(n, None, None),
-                                 chunks=(19,19,1),
+                                 chunks=(1,19,19),
                                  compression='gzip', dtype='uint8')
                 g.create_dataset('skeleton', (n, 50, 2),
                                  maxshape=(n, 200, 2),
-                                 chunks=True, dtype='int32')
+                                 chunks=(1,50,2), dtype='int32')
                 g.create_dataset('skeletonSpline',
                                  (n, self.imageProcessor.numberOfPosturePoints, 2),
                                  maxshape=(n, 100, 2),
-                                 chunks=True, dtype='float64')
+                                 chunks=(1,10,2), dtype='float64')
                 g.create_dataset('centroid', (n, 2), dtype='float64')
                 g.create_dataset('midpoint', (n, 2), dtype='float64')
                 g.create_dataset('width', (n,), dtype='float64')
                 g.create_dataset('length', (n,), dtype='float64')
                 g.create_dataset('meanBodyAngle', (n,), dtype='float64')
                 g.create_dataset('posture', (n, self.imageProcessor.numberOfPosturePoints),
-                                 maxshape=(n, 100), dtype='float64')
+                                 maxshape=(n, 100),
+                                 chunks=(1, 10), dtype='float64')
                 g.create_dataset('wormContour', (n, 2, 1, 2),
-                                 maxshape=(n, None, 1, 2), chunks=True,
+                                 maxshape=(n, None, 1, 2),
+                                 chunks=(1, 10, 1, 2),
                                  fillvalue=-1,
                                  dtype='int32')
                 g.create_dataset('time', (n,), dtype='float64')
