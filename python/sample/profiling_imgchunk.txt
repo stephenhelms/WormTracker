@@ -1,0 +1,249 @@
+Wed Jun 25 16:22:40 2014    region
+
+         3936027 function calls in 61.922 seconds
+
+Stephen Notes:
+Video file local, image chunk size (1,19,19)
+Morphology operations - 51%
+Video read - 24%
+Writing measurements - 12%
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000   61.922   61.922 <string>:1(<module>)
+        1    0.013    0.013   61.922   61.922 profilewt.py:21(test)
+        1    1.519    1.519   61.909   61.909 __init__.py:342(process)
+     1201    0.039    0.000   44.939    0.037 __init__.py:364(processFrame)
+     1201    0.487    0.000   31.508    0.026 wormimageprocessor.py:76(applyMorphologicalCleaning)
+    30025    0.262    0.000   23.380    0.001 morphology.py:215(_binary_erosion)
+    30025   18.174    0.001   18.174    0.001 {scipy.ndimage._nd_image.binary_erosion}
+    14412    0.308    0.000   16.738    0.001 morphology.py:734(binary_hit_or_miss)
+     1201    0.091    0.000   15.660    0.013 wormimageprocessor.py:177(bwdiagfill)
+     1202   14.828    0.012   14.828    0.012 {method 'read' of 'cv2.VideoCapture' objects}
+     1201    1.075    0.001    7.345    0.006 __init__.py:616(store)
+     1201    0.036    0.000    7.158    0.006 morphology.py:968(binary_fill_holes)
+     1201    0.021    0.000    7.108    0.006 morphology.py:378(binary_dilation)
+     1201    0.004    0.000    5.400    0.004 filters.py:1003(median_filter)
+     1201    0.028    0.000    5.396    0.004 filters.py:929(_rank_filter)
+     1201    5.287    0.004    5.287    0.004 {scipy.ndimage._nd_image.rank_filter}
+     1201    0.004    0.000    4.265    0.004 __init__.py:402(measureWorm)
+     1201    0.010    0.000    4.258    0.004 __init__.py:541(measureWorm)
+     1201    0.539    0.000    3.961    0.003 __init__.py:570(calculatePosture)
+     1201    3.900    0.003    3.900    0.003 {scipy.ndimage._nd_image.binary_erosion2}
+     1201    0.041    0.000    3.097    0.003 __init__.py:519(skeletonizeWorm)
+    15928    0.349    0.000    2.993    0.000 dataset.py:456(__setitem__)
+     1201    1.515    0.001    2.607    0.002 _clear_border.py:5(clear_border)
+    36894    0.183    0.000    1.977    0.000 group.py:145(__getitem__)
+     1201    0.034    0.000    1.219    0.001 wormimageprocessor.py:200(find1Cpixels)
+     1201    0.197    0.000    1.141    0.001 _skeletonize.py:13(skeletonize)
+     3603    1.104    0.000    1.104    0.000 {cv2.morphologyEx}
+     1201    0.136    0.000    1.097    0.001 wormimageprocessor.py:64(applyBackgroundFilter)
+     1201    0.015    0.000    0.990    0.001 measurements.py:46(label)
+     1201    0.834    0.001    0.857    0.001 {scipy.ndimage._ni_label._label}
+    36894    0.853    0.000    0.853    0.000 {h5py.h5o.open}
+    34508    0.314    0.000    0.837    0.000 dataset.py:238(__init__)
+    15928    0.809    0.000    0.809    0.000 {method 'write' of 'h5py.h5d.DatasetID' objects}
+    87762    0.707    0.000    0.707    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     1074    0.341    0.000    0.664    0.001 mcp.py:4(route_through_array)
+    15928    0.070    0.000    0.624    0.000 selections.py:26(select)
+     1202    0.004    0.000    0.619    0.001 files.py:241(__exit__)
+     1202    0.002    0.000    0.614    0.001 files.py:226(close)
+     1202    0.612    0.001    0.612    0.001 {method 'close' of 'h5py.h5f.FileID' objects}
+     1201    0.601    0.001    0.602    0.001 __init__.py:21(logPrint)
+   260773    0.525    0.000    0.525    0.000 {numpy.core.multiarray.array}
+    45993    0.051    0.000    0.516    0.000 fromnumeric.py:1716(product)
+   187519    0.098    0.000    0.511    0.000 numeric.py:392(asarray)
+    59528    0.469    0.000    0.476    0.000 dataset.py:156(shape)
+    31856    0.160    0.000    0.435    0.000 selections.py:269(broadcast)
+     1201    0.102    0.000    0.412    0.000 wormimageprocessor.py:108(identifyPossibleWorms)
+     1202    0.009    0.000    0.385    0.000 files.py:189(__init__)
+     8750    0.009    0.000    0.358    0.000 filters.py:534(correlate)
+    15928    0.086    0.000    0.357    0.000 selections.py:247(__getitem__)
+     8750    0.038    0.000    0.353    0.000 fromnumeric.py:51(take)
+     8750    0.070    0.000    0.349    0.000 filters.py:507(_correlate_or_convolve)
+    34508    0.320    0.000    0.320    0.000 {method 'get_create_plist' of 'h5py.h5d.DatasetID' objects}
+     8750    0.025    0.000    0.315    0.000 fromnumeric.py:38(_wrapit)
+     1202    0.003    0.000    0.315    0.000 files.py:62(make_fid)
+     1201    0.311    0.000    0.311    0.000 {h5py.h5f.open}
+     1201    0.271    0.000    0.271    0.000 {cv2.findContours}
+     1201    0.227    0.000    0.261    0.000 wormimageprocessor.py:71(applyThreshold)
+    39976    0.075    0.000    0.233    0.000 _ni_support.py:70(_get_output)
+    15928    0.083    0.000    0.214    0.000 selections.py:491(_handle_simple)
+     1201    0.034    0.000    0.214    0.000 __init__.py:560(calculateWidth)
+    63712    0.187    0.000    0.194    0.000 dataset.py:169(dtype)
+    85360    0.188    0.000    0.188    0.000 {numpy.core.multiarray.zeros}
+    15928    0.054    0.000    0.183    0.000 selections.py:241(__init__)
+    34508    0.114    0.000    0.179    0.000 filters.py:200(get_filters)
+     2402    0.059    0.000    0.177    0.000 morphology.py:122(generate_binary_structure)
+     8750    0.175    0.000    0.175    0.000 {scipy.ndimage._nd_image.correlate}
+    17500    0.018    0.000    0.162    0.000 fromnumeric.py:1762(any)
+    30025    0.103    0.000    0.160    0.000 morphology.py:47(_center_is_true)
+    33628    0.148    0.000    0.148    0.000 {method 'astype' of 'numpy.ndarray' objects}
+   431505    0.136    0.000    0.136    0.000 {isinstance}
+     3476    0.100    0.000    0.130    0.000 numeric.py:1682(indices)
+    31873    0.129    0.000    0.129    0.000 {h5py.h5s.create_simple}
+    15928    0.038    0.000    0.122    0.000 selections.py:144(__init__)
+    55589    0.089    0.000    0.120    0.000 _ni_support.py:55(_normalize_sequence)
+     1074    0.118    0.000    0.118    0.000 {min}
+    17502    0.013    0.000    0.117    0.000 {method 'any' of 'numpy.ndarray' objects}
+    13962    0.021    0.000    0.113    0.000 fromnumeric.py:1621(sum)
+     2148    0.106    0.000    0.111    0.000 fitpack2.py:127(__init__)
+     1201    0.004    0.000    0.106    0.000 group.py:132(require_group)
+    17502    0.014    0.000    0.104    0.000 _methods.py:31(_any)
+     1074    0.086    0.000    0.103    0.000 {method 'find_costs' of 'skimage.graph._mcp.MCP' objects}
+    15163    0.014    0.000    0.099    0.000 _methods.py:23(_sum)
+    41177    0.046    0.000    0.096    0.000 type_check.py:237(iscomplexobj)
+     4296    0.013    0.000    0.078    0.000 fitpack2.py:231(__call__)
+     2402    0.053    0.000    0.076    0.000 arraysetops.py:284(in1d)
+    15928    0.050    0.000    0.072    0.000 selections.py:468(_expand_ellipsis)
+     1074    0.041    0.000    0.070    0.000 function_base.py:1122(unwrap)
+     8750    0.068    0.000    0.068    0.000 {method 'take' of 'numpy.ndarray' objects}
+     4296    0.020    0.000    0.058    0.000 fitpack.py:515(splev)
+     1074    0.049    0.000    0.058    0.000 {method 'traceback' of 'skimage.graph._mcp.MCP' objects}
+     1201    0.008    0.000    0.056    0.000 __init__.py:550(calculateCentroid)
+     1204    0.053    0.000    0.056    0.000 group.py:286(__contains__)
+    87762    0.056    0.000    0.056    0.000 {zip}
+     1202    0.004    0.000    0.052    0.000 genericpath.py:26(isfile)
+     4668    0.011    0.000    0.052    0.000 dataset.py:252(resize)
+    31974    0.021    0.000    0.051    0.000 numeric.py:462(asanyarray)
+    15928    0.050    0.000    0.050    0.000 {h5py.h5t.check_dtype}
+     1202    0.004    0.000    0.048    0.000 files.py:29(make_fapl)
+     1202    0.047    0.000    0.047    0.000 {nt.stat}
+     1201    0.018    0.000    0.042    0.000 arraysetops.py:93(unique)
+     3603    0.041    0.000    0.041    0.000 {cv2.getStructuringElement}
+     1219    0.041    0.000    0.041    0.000 {h5py.h5p.create}
+   234826    0.040    0.000    0.040    0.000 base.py:211(id)
+    38116    0.036    0.000    0.039    0.000 base.py:91(_e)
+     1201    0.013    0.000    0.034    0.000 wormimageprocessor.py:115(<dictcomp>)
+     1074    0.010    0.000    0.034    0.000 __init__.py:511(outlineWorm)
+     3349    0.026    0.000    0.034    0.000 __init__.py:606(toCroppedCoordinates)
+     2406    0.005    0.000    0.034    0.000 fromnumeric.py:1842(all)
+    15928    0.033    0.000    0.033    0.000 {method 'select_hyperslab' of 'h5py.h5s.SpaceID' objects}
+     1201    0.033    0.000    0.033    0.000 {cv2.threshold}
+     3603    0.029    0.000    0.029    0.000 {method 'copy' of 'numpy.ndarray' objects}
+   319164    0.029    0.000    0.029    0.000 {len}
+     1201    0.029    0.000    0.029    0.000 {numpy.core.multiarray.where}
+    34508    0.028    0.000    0.028    0.000 {method 'get_nfilters' of 'h5py.h5p.PropDCID' objects}
+     1074    0.002    0.000    0.027    0.000 fromnumeric.py:2632(mean)
+     1074    0.010    0.000    0.025    0.000 _methods.py:49(_mean)
+     2406    0.004    0.000    0.025    0.000 {method 'all' of 'numpy.ndarray' objects}
+     9227    0.024    0.000    0.024    0.000 {numpy.core.multiarray.arange}
+     2275    0.019    0.000    0.024    0.000 __init__.py:611(toRegionCoordinates)
+     4423    0.014    0.000    0.022    0.000 twodim_base.py:65(flipud)
+    17256    0.014    0.000    0.022    0.000 selections.py:537(_translate_slice)
+     4668    0.005    0.000    0.022    0.000 dataset.py:181(chunks)
+     1201    0.005    0.000    0.021    0.000 numeric.py:78(zeros_like)
+     4423    0.021    0.000    0.021    0.000 {numpy.core.multiarray.copyto}
+    35037    0.021    0.000    0.021    0.000 {cv2.contourArea}
+    38002    0.021    0.000    0.021    0.000 {range}
+     2406    0.004    0.000    0.021    0.000 _methods.py:35(_all)
+   203379    0.021    0.000    0.021    0.000 {method 'append' of 'list' objects}
+    15928    0.008    0.000    0.020    0.000 selections.py:165(nselect)
+    15928    0.012    0.000    0.020    0.000 dataset.py:466(<genexpr>)
+    49109    0.020    0.000    0.020    0.000 selections.py:300(<genexpr>)
+    49109    0.014    0.000    0.019    0.000 dataset.py:467(<genexpr>)
+     4296    0.009    0.000    0.019    0.000 shape_base.py:8(atleast_1d)
+     4668    0.019    0.000    0.019    0.000 {method 'set_extent' of 'h5py.h5d.DatasetID' objects}
+    36894    0.018    0.000    0.018    0.000 {h5py.h5i.get_type}
+     1201    0.002    0.000    0.017    0.000 {method 'sum' of 'numpy.ndarray' objects}
+    42251    0.017    0.000    0.017    0.000 {issubclass}
+    12012    0.017    0.000    0.017    0.000 {method 'get_filter' of 'h5py.h5p.PropDCID' objects}
+    38114    0.017    0.000    0.017    0.000 base.py:240(__init__)
+     2148    0.002    0.000    0.017    0.000 _methods.py:15(_amax)
+     1074    0.014    0.000    0.016    0.000 function_base.py:8(linspace)
+     1201    0.012    0.000    0.015    0.000 __init__.py:498(cropToWorm)
+    15928    0.008    0.000    0.014    0.000 {sum}
+     1201    0.013    0.000    0.013    0.000 {method 'sort' of 'numpy.ndarray' objects}
+     1074    0.013    0.000    0.013    0.000 {cv2.drawContours}
+     2275    0.013    0.000    0.013    0.000 {cv2.findNonZero}
+    10740    0.009    0.000    0.013    0.000 index_tricks.py:490(__next__)
+    95568    0.013    0.000    0.013    0.000 selections.py:160(shape)
+     1074    0.011    0.000    0.013    0.000 function_base.py:939(diff)
+    15928    0.012    0.000    0.012    0.000 {method 'get_select_npoints' of 'h5py.h5s.SpaceID' objects}
+     4668    0.011    0.000    0.011    0.000 {method 'get_chunk' of 'h5py.h5p.PropDCID' objects}
+     1201    0.011    0.000    0.011    0.000 {cv2.moments}
+     4296    0.011    0.000    0.011    0.000 {scipy.interpolate._fitpack._spl_}
+     5751    0.011    0.000    0.011    0.000 {numpy.core.multiarray.empty}
+    15928    0.010    0.000    0.010    0.000 {method 'select_all' of 'h5py.h5s.SpaceID' objects}
+    33184    0.010    0.000    0.010    0.000 selections.py:264(<genexpr>)
+     3606    0.006    0.000    0.009    0.000 group.py:27(__init__)
+     7645    0.009    0.000    0.009    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+     1201    0.005    0.000    0.008    0.000 fromnumeric.py:1072(squeeze)
+     8271    0.008    0.000    0.008    0.000 {max}
+     1201    0.008    0.000    0.008    0.000 wormimageprocessor.py:38(cropImageToRegion)
+    17256    0.008    0.000    0.008    0.000 {method 'pop' of 'list' objects}
+    17256    0.007    0.000    0.007    0.000 {method 'indices' of 'slice' objects}
+    15925    0.007    0.000    0.007    0.000 selections.py:524(_translate_int)
+     1202    0.007    0.000    0.007    0.000 {method 'encode' of 'str' objects}
+     1074    0.001    0.000    0.007    0.000 _methods.py:19(_amin)
+     1201    0.007    0.000    0.007    0.000 {numpy.core.multiarray.concatenate}
+     1074    0.002    0.000    0.006    0.000 numeric.py:136(ones)
+    15931    0.006    0.000    0.006    0.000 selections.py:471(<genexpr>)
+        1    0.001    0.001    0.006    0.006 __init__.py:407(saveConfiguration)
+     4668    0.005    0.000    0.005    0.000 {method 'get_layout' of 'h5py.h5p.PropDCID' objects}
+    36911    0.005    0.000    0.005    0.000 base.py:79(_lapl)
+     1201    0.005    0.000    0.005    0.000 {numpy.core.multiarray.empty_like}
+     2148    0.004    0.000    0.004    0.000 fitpack2.py:166(_reset_class)
+     1074    0.003    0.000    0.004    0.000 _methods.py:39(_count_reduce_items)
+     1074    0.004    0.000    0.004    0.000 {method 'cumsum' of 'numpy.ndarray' objects}
+     9951    0.004    0.000    0.004    0.000 _ni_support.py:38(_extend_mode_to_code)
+     1201    0.002    0.000    0.004    0.000 wormimageprocessor.py:132(expectedWormAreaPixels)
+     1201    0.004    0.000    0.004    0.000 {method 'flatten' of 'numpy.ndarray' objects}
+     1201    0.004    0.000    0.004    0.000 {method 'format' of 'str' objects}
+     6005    0.004    0.000    0.004    0.000 {method 'ravel' of 'numpy.ndarray' objects}
+     1201    0.004    0.000    0.004    0.000 {cv2.boundingRect}
+     1201    0.003    0.000    0.003    0.000 {method 'squeeze' of 'numpy.ndarray' objects}
+     1074    0.002    0.000    0.003    0.000 index_tricks.py:487(__init__)
+    10740    0.003    0.000    0.003    0.000 {next}
+     1201    0.003    0.000    0.003    0.000 __init__.py:475(__init__)
+       17    0.000    0.000    0.003    0.000 group.py:44(create_dataset)
+     1202    0.003    0.000    0.003    0.000 {method 'set_fclose_degree' of 'h5py.h5p.PropFAID' objects}
+     8750    0.003    0.000    0.003    0.000 {getattr}
+        1    0.003    0.003    0.003    0.003 {method 'open' of 'cv2.VideoCapture' objects}
+    15928    0.003    0.000    0.003    0.000 dataset.py:469(<genexpr>)
+    12012    0.002    0.000    0.002    0.000 {method 'get' of 'dict' objects}
+     1093    0.002    0.000    0.002    0.000 {abs}
+     1201    0.001    0.000    0.002    0.000 stat.py:49(S_ISREG)
+    15928    0.002    0.000    0.002    0.000 {method 'reverse' of 'list' objects}
+       17    0.000    0.000    0.002    0.000 dataset.py:36(make_new_dset)
+     2402    0.001    0.000    0.001    0.000 {time.clock}
+     1201    0.001    0.000    0.001    0.000 wormimageprocessor.py:124(expectedWormLengthPixels)
+       17    0.000    0.000    0.001    0.000 filters.py:71(generate_dcpl)
+     1201    0.001    0.000    0.001    0.000 index_tricks.py:630(__getitem__)
+        1    0.001    0.001    0.001    0.001 {h5py.h5f.create}
+     2315    0.001    0.000    0.001    0.000 __init__.py:380(<lambda>)
+     1074    0.001    0.000    0.001    0.000 {method 'transpose' of 'numpy.ndarray' objects}
+        4    0.000    0.000    0.001    0.000 filters.py:246(guess_chunk)
+     1201    0.001    0.000    0.001    0.000 {nt.getpid}
+     3476    0.001    0.000    0.001    0.000 selections.py:236(mshape)
+     1201    0.001    0.000    0.001    0.000 stat.py:24(S_IFMT)
+     1201    0.001    0.000    0.001    0.000 wormimageprocessor.py:128(expectedWormWidthPixels)
+       17    0.000    0.000    0.000    0.000 {h5py.h5d.create}
+     1202    0.000    0.000    0.000    0.000 {sys.getfilesystemencoding}
+       17    0.000    0.000    0.000    0.000 group.py:228(__setitem__)
+      148    0.000    0.000    0.000    0.000 fitpack2.py:190(_set_class)
+     1202    0.000    0.000    0.000    0.000 files.py:238(__enter__)
+     1074    0.000    0.000    0.000    0.000 index_tricks.py:504(__iter__)
+       17    0.000    0.000    0.000    0.000 {h5py.h5o.link}
+       18    0.000    0.000    0.000    0.000 base.py:101(get_lcpl)
+        1    0.000    0.000    0.000    0.000 group.py:34(create_group)
+       17    0.000    0.000    0.000    0.000 {h5py.h5t.py_create}
+       18    0.000    0.000    0.000    0.000 {method 'copy' of 'h5py.h5p.PropInstanceID' objects}
+        1    0.000    0.000    0.000    0.000 {h5py.h5g.create}
+        6    0.000    0.000    0.000    0.000 {method 'set_chunk' of 'h5py.h5p.PropDCID' objects}
+       18    0.000    0.000    0.000    0.000 {method 'set_char_encoding' of 'h5py.h5p.PropLCID' objects}
+       34    0.000    0.000    0.000    0.000 filters.py:86(rq_tuple)
+       16    0.000    0.000    0.000    0.000 filters.py:296(<genexpr>)
+        1    0.000    0.000    0.000    0.000 {method 'set_fill_value' of 'h5py.h5p.PropDCID' objects}
+       29    0.000    0.000    0.000    0.000 {any}
+        6    0.000    0.000    0.000    0.000 {method 'set_fill_time' of 'h5py.h5p.PropDCID' objects}
+       24    0.000    0.000    0.000    0.000 dataset.py:111(<genexpr>)
+        2    0.000    0.000    0.000    0.000 {method 'set_deflate' of 'h5py.h5p.PropDCID' objects}
+        1    0.000    0.000    0.000    0.000 {cv2.VideoCapture}
+       16    0.000    0.000    0.000    0.000 filters.py:256(<genexpr>)
+       18    0.000    0.000    0.000    0.000 base.py:85(_lcpl)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+        3    0.000    0.000    0.000    0.000 {method 'extend' of 'list' objects}
+
+
