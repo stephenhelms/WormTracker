@@ -430,11 +430,11 @@ class WormVideoRegion:
                 g.create_dataset('boundingBox', (n, 4), dtype='int32')
                 g.create_dataset('bwWormImage', (n, 150, 150),
                                  maxshape=(n, None, None),
-                                 chunks=True,
+                                 chunks=(19,19,1),
                                  compression='gzip', dtype='b')
                 g.create_dataset('grayWormImage', (n, 150, 150),
                                  maxshape=(n, None, None),
-                                 chunks=True,
+                                 chunks=(19,19,1),
                                  compression='gzip', dtype='uint8')
                 g.create_dataset('skeleton', (n, 50, 2),
                                  maxshape=(n, 200, 2),
