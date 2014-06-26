@@ -396,8 +396,8 @@ class WormVideoRegion:
                 worm.store(self.resultsStoreFile,
                            pre, idx)
             except(Exception) as e:
-                Logger.logPrint('Error in {0} {1} frame {2} analyzing worm.'.format(
-                    self.strainName, self.wormName, str(idx)))
+                Logger.logPrint('Error in {0} {1} frame {2} analyzing worm: {3}'.format(
+                    self.strainName, self.wormName, str(idx), str(e)))
 
     def measureWorm(self, grayFrame, bwFrame, wormContour):
         worm = WormImage(self, grayFrame, bwFrame, wormContour)
@@ -514,7 +514,7 @@ class WormImage:
         self.outlinedWormImage = np.zeros(self.bwWormImage.shape,
                                           dtype=np.uint8)
         cv2.drawContours(self.outlinedWormImage,
-                         [self.toCroppedCoordinates(self.wormContour)],
+                         [self.toCroppedCoordinates(self.wormContour).astype('int')],
                          0, 255, thickness=1)
         self.outlinedWormImage = np.equal(self.outlinedWormImage, 255)
 
@@ -552,8 +552,8 @@ class WormImage:
     def calculateCentroid(self):
         moments = cv2.moments(self.wormContour)
         if moments['m00'] != 0:  # only calculate if there is a non-zero area
-            cx = moments['m10']/moments['m00']  # cx = M10/M00
-            cy = moments['m01']/moments['m00']
+            cx = float(moments['m10'])/float(moments['m00'])  # cx = M10/M00
+            cy = float(moments['m01'])/float(moments['m00'])
             self.centroid = self.toRegionCoordinates( \
                 np.flipud(self.toCroppedCoordinates([cx, cy])))
         else:
@@ -608,12 +608,12 @@ class WormImage:
     def toCroppedCoordinates(self, pts):
         if self.boundingBox is None:
             self.cropToWorm()
-        return pts - np.array(self.boundingBox[0:2])
+        return pts - np.array(self.boundingBox[0:2], 'f8')
 
     def toRegionCoordinates(self, pts):
         if self.boundingBox is None:
             self.cropToWorm()  # crop the frame to the worm
-        return pts + np.array(self.boundingBox[0:2])
+        return pts + np.array(self.boundingBox[0:2], 'f8')
 
     def store(self, storeFile, storePath, index):
         if os.path.isfile(storeFile):

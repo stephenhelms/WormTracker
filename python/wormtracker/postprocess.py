@@ -6,7 +6,7 @@ from wormtracker import Logger
 
 class WormTrajectoryPostProcessor:
     # bad frame settings
-    filterByWidth = False
+    filterByWidth = True
     filterByLength = True
     widthThreshold = (0.5, 1.5)
     lengthThreshold = (0.8, 1.2)
