@@ -1,4 +1,4 @@
-from subprocess import check_output
+from subprocess import check_output, STDOUT
 import sys
 import os
 import cPickle
@@ -32,7 +32,7 @@ def parallelProcessRegions(wormVideo):
     wormVideo.saveConfiguration()
     pool = multiprocessing.Pool()
     result = pool.map_async(processRegion, wormVideo.regions)
-    Logger.logPrint(result.get())
+    Logger.logPrint(','.join([str(r) for r in result.get()]))
     pool.close()
     pool.join()
     Logger.logPrint('Finished analyzing all regions')
@@ -76,24 +76,38 @@ def cleanUpPostProcess(wormVideo):
 
         # Linux: create command, do no escape argument values and keep arguments as separated argument list: 
 
+        # have to copy because the merge will fail if there are any duplicates
         cmd = [hdf5path + 'h5copy', '-i', os.path.join(path, name), '-o',
              outputFile, '-s', obj, '-d', obj, '-p']
         
         Logger.logPrint('Executing:'+' '.join(cmd))
-        Logger.logPrint(check_output(cmd));
-         
-        for region in wormVideo.regions:
-            
-            args = [hdf5path + 'h5copy', '-i', os.path.join(path,'{1}_{2}_{0}'),
-                          '-o', os.path.join(path, 'merge_{0}'), '-s',
-                          '/worms/{1}/{2}','-d', '/worms/{1}/{2}',
-                          '-p']
-            #update 
-            cmd=[arg.format(name,region.strainName,region.wormName) for arg in args] 
+        Logger.logPrint(check_output(cmd))
 
-            Logger.logPrint('Executing:'+' '.join(cmd))
-            Logger.logPrint('Output:'+check_output(cmd))
-        
+        # remove premerge file
+        os.remove(wormVideo.storeFile)
+  
+        for region in wormVideo.regions:
+            try:
+                args = [hdf5path + 'h5copy', '-i', os.path.join(path,'{1}_{2}_{0}'),
+                              '-o', os.path.join(path, 'merge_{0}'), '-s',
+                              '/worms/{1}/{2}','-d', '/worms/{1}/{2}',
+                              '-p']
+                #update 
+                cmd=[arg.format(name,region.strainName,region.wormName) for arg in args] 
+
+                Logger.logPrint('Executing:'+' '.join(cmd))
+                Logger.logPrint('Output:'+check_output(cmd, stderr=STDOUT))
+                # remove premerge file
+                os.remove(os.path.join(path,
+                                       '{1}_{2}_{0}').format(name,
+                                                             region.strainName,
+                                                             region.wormName))
+            except(Exception) as e:
+                Logger.logPrint('Error cleaning up:')
+                Logger.logPrint('Exception:'+str(e))
+
+        # rename merge file
+        os.rename(outputFile, wormVideo.storeFile)
     except(Exception) as e:
         Logger.logPrint('Error cleaning up:')
         Logger.logPrint('Exception:'+str(e))
