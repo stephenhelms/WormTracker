@@ -11,7 +11,7 @@ import collections
 import cv2
 import wormtracker.wormimageprocessor as wip
 import multiprocessing as multi
-from numba import jit
+#from numba import jit
 import scipy.stats as ss
 from tsstats import *
 from stats import *
@@ -37,7 +37,6 @@ def pairwise(iterable):
 
 
 class WormTrajectory:
-    filterByWidth = False
 
     def __init__(self, h5obj, strain, wormID, videoFilePath=None):
         self.firstFrame = None
@@ -147,7 +146,7 @@ class WormTrajectory:
         plt.xlim((0, 10000))
         plt.ylim((0, 10000))
         plt.xlabel('x (um)')
-        plt.xlabel('y (um)')
+        plt.ylabel('y (um)')
         plt.gca().set_aspect('equal')
         if showPlot:
             plt.show()
@@ -165,6 +164,14 @@ class WormTrajectory:
         plt.plot(self.t, phi/np.pi, 'k.')
         plt.xlabel('Time (s)')
         plt.ylabel('Bearing ($\pi$ rad)')
+        if showPlot:
+            plt.show()
+
+    def plotBodyBearing(self, showPlot=True):
+        psi = self.getMaskedPosture(self.psi)
+        plt.plot(self.t, psi/np.pi, 'k.')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Body Bearing ($\pi$ rad)')
         if showPlot:
             plt.show()
 
@@ -206,6 +213,36 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
+    def getBodyBearingAutocorrelation(self, maxT=100):
+        n = int(np.round(maxT*self.frameRate))
+        tau = range(n)/self.frameRate
+        psi = self.getMaskedPosture(self.psi)
+        C = circacf(psi, n)
+        return tau, C
+
+    def plotBodyBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):
+        tau, C = self.getBodyBearingAutocorrelation(maxT)
+        plt.plot(tau, C, '-', color=color)
+        plt.xlabel(r'$\tau (s)$')
+        plt.ylabel(r'$\langle \cos \left[ \psi(t+\tau) - \psi(t) \right] \rangle$')
+        if showPlot:
+            plt.show()
+
+    def getReversalStateAutocorrelation(self, maxT=100):
+        n = int(np.round(maxT*self.frameRate))
+        tau = range(n)/self.frameRate
+        dpsi = self.getMaskedPosture(self.dpsi)
+        C = acf(np.cos(dpsi), n)
+        return tau, C
+
+    def plotReversalStateAutocorrelation(self, maxT=100, color='k', showPlot=True):
+        tau, C = self.getReversalStateAutocorrelation(maxT)
+        plt.plot(tau, C, '-', color=color)
+        plt.xlabel(r'$\tau (s)$')
+        plt.ylabel(r'$\langle \cos \Delta\psi(t) \cdot \cos \Delta\psi(t+\tau) \rangle$')
+        if showPlot:
+            plt.show()
+
     def getBearingAutocorrelation(self, maxT=100):
         n = int(np.round(maxT*self.frameRate))
         tau = range(n)/self.frameRate
@@ -215,8 +252,8 @@ class WormTrajectory:
 
     def plotBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):
         tau, C = self.getBearingAutocorrelation(maxT)
-        plt.semilogx(tau, C, '-', color=color)
-        plt.xlabel(r'$\log \tau / (s)$')
+        plt.plot(tau, C, '-', color=color)
+        plt.xlabel(r'$\tau / (s)$')
         plt.ylabel(r'$\langle \cos\left[\psi(t)-\psi(t+\tau)\right]\rangle$')
         if showPlot:
             plt.show()

@@ -163,7 +163,7 @@ class WormVideo:
         self.imageProcessor.pixelSize = (sel.distance() /
                                          self.referenceDistance)
         self.imageProcessor.determineNumberOfPosturePoints()
-        WormVideo.logPrint("The pixel size is " + str(1.0/self.imageProcessor.pixelSize) + " um/px.")
+        Logger.logPrint("The pixel size is " + str(1.0/self.imageProcessor.pixelSize) + " um/px.")
 
     def defineFoodRegions(self):
         if self.firstFrame is None:
@@ -235,9 +235,13 @@ class WormVideo:
                                               likelyWorm[0])
                         wormImage.measureWorm()
                         wormImage.plot(bodyPtMarkerSize=30)
+                        print '{0} {1}: worm {2} um long, {3} um wide'.format(region.strainName,
+                                                                             region.wormName,
+                                                                             wormImage.length,
+                                                                             wormImage.width)
                     except(Exception) as e:
                         Logger.logPrint('Error in {0} {1}: {2}'.format(region.strainName,
-                                                             region.wormName+':'+
+                                                             region.wormName,
                                                              str(e)))
             plt.title(region.strainName + ' ' + region.wormName)
         plt.show()
@@ -468,7 +472,7 @@ class WormVideoRegion:
 class WormImage:
     # default plot variables
     smoothing = 0.05
-    outlineColor = (255, 255, 0)
+    outlineColor = (0, 255, 255)
     skeletonColor = 'y'
     postureColormap = plt.get_cmap('PuOr')
     centroidColor = 'r'
@@ -567,7 +571,7 @@ class WormImage:
         self.outlineWorm()
         cpts = np.float64(cv2.findNonZero(np.uint8(self.outlinedWormImage)))
         self.width = (min(np.sqrt(np.sum(np.float64(cpts - mp)**2, axis=2)))
-                      * 2.0 / self.videoRegion.imageProcessor.pixelSize)
+                      * 2.0 / self.videoRegion.imageProcessor.pixelSize)[0]
 
     def calculatePosture(self):
         self.skeletonizeWorm()  # find skeleton and length
@@ -584,7 +588,7 @@ class WormImage:
                             (pts[i, 1]-pts[i-1, 1])**2) +
                     s[i-1])
         # calculate length
-        self.length = s[-1]/self.videoRegion.imageProcessor.pixelSize
+        self.length = s[-1][0]/self.videoRegion.imageProcessor.pixelSize
         # fit spline to skeleton
         fx = interpolate.UnivariateSpline(s/s[-1], pts[:, 0],
                                           s=self.smoothing*pts.shape[0])
@@ -699,9 +703,10 @@ class WormImage:
                                         norm_type=cv2.NORM_MINMAX),
                           cv2.COLOR_GRAY2RGB)
         cv2.drawContours(im,
-                         [self.toCroppedCoordinates(self.wormContour)],
+                         np.array([self.toCroppedCoordinates(self.wormContour).astype('int32')]),
                          0, self.outlineColor)
         plt.imshow(im, interpolation='none')
+        plt.axis('off')
         plt.hold(True)
         if self.centroid is not None:
             c = self.toCroppedCoordinates(self.centroid)

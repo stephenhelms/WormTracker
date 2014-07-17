@@ -102,7 +102,7 @@ class AnimatedWormTrajectoryWithImage:
             good = (~self.badFrames).nonzero()[0]
             frames = xrange(good[0], good[-1])
         if interval is None:
-            interval = 1000/self.frameRate
+            interval = 1000./self.frameRate
         return animation.FuncAnimation(figure, self.plot,
                                        frames=frames,
                                        init_func=self.initialView,

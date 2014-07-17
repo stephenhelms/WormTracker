@@ -20,7 +20,6 @@ def saveWormVideo(video, f):
 
 def getSystemConfigDict():
     return {
-        'libavPath': wt.libavPath,
         'hdf5Path': wtp.hdf5path
     }
 
@@ -30,7 +29,7 @@ def getVideoConfigDict(video):
         'videoFile': video.videoFile,
         'storeFile': video.storeFile,
         'backgroundDiskRadius': video.imageProcessor.backgroundDiskRadius,
-        'pixelsPerMicron': video.imageProcessor.pixelSize,
+        'pixelsPerMicron': float(video.imageProcessor.pixelSize),
         'threshold': video.imageProcessor.threshold,
         'wormAreaThresholdRange': video.imageProcessor.wormAreaThresholdRange,
         'wormDiskRadius': video.imageProcessor.wormDiskRadius,
@@ -42,21 +41,26 @@ def getVideoConfigDict(video):
 
 
 def getRegionConfigDict(region):
-    if type(region.foodCircle[0]) is not float:
-            region.foodCircle = tuple(float(n) for n in region.foodCircle)
-    return {
+    config = {
         'strainName': region.strainName,
         'wormName': region.wormName,
         'cropRegion': region.cropRegion,
-        'foodCircle': region.foodCircle
     }
+    if region.foodCircle is not None:
+        if type(region.foodCircle[0]) is not float:
+            region.foodCircle = tuple(float(n) for n in region.foodCircle)
+        config['foodCircle'] = region.foodCircle
+    return config
 
 
 def loadWormVideos(f):
     config = yaml.load(f)
     # load system settings
-    wt.libavPath = config['systemSettings']['libavPath']
-    wtp.hdf5path = config['systemSettings']['hdf5Path']
+    if 'systemSettings' in config:
+        if 'libavPath' in config['systemSettings']:
+            wt.libavPath = config['systemSettings']['libavPath']
+        if 'hdf5Path' in config['systemSettings']:
+            wtp.hdf5path = config['systemSettings']['hdf5Path']
 
     videos = []
     for videoC in config['videos']:
@@ -79,7 +83,8 @@ def loadWormVideos(f):
             wr = video.addRegion(region['cropRegion'],
                                  region['strainName'],
                                  region['wormName'])
-            wr.foodCircle = region['foodCircle']
+            if 'foodCircle' in region:
+                wr.foodCircle = region['foodCircle']
 
         # re-initialize state
         video.readFirstFrame(askForFrameRate=False)
