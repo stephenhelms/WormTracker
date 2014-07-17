@@ -1,0 +1,6 @@
+To process a video (serial) from the terminal using a .yml config file:
+python runbatchanalysis.py -i configfile.yml -s
+
+To process a video in parallel (not working on my mac for some reason, but works everywhere else):
+(uses all available cores, splitting each region to a separate process)
+python runbatchanalysis.py -i configfile.yml

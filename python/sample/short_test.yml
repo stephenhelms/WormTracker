@@ -1,4 +1,4 @@
-systemSettings: {hdf5Path: 'C:\hdf5\', libavPath: 'C:\libav\bin\'}
+systemSettings: {hdf5Path: ''}
 videos:
 - regions:
   - cropRegion: !!python/tuple [461, 157, 311, 393]
@@ -68,12 +68,12 @@ videos:
   videoSettings:
     backgroundDiskRadius: 5
     expectedWormLength: 1000
-    expectedWormWidth: 50
+    expectedWormWidth: 70
     frameRate: 11.5
     pixelsPerMicron: 0.05
     numberOfPosturePoints: 30
-    storeFile: D:\wormTest\out\short_test.h5
+    storeFile: /Users/stephenhelms/out/short_test.h5
     threshold: 0.9
-    videoFile: D:\wormTest\short_test.avi
+    videoFile: /Users/stephenhelms/Dropbox/OpenData/short_test.avi
     wormAreaThresholdRange: [0.5, 1.5]
     wormDiskRadius: 2
