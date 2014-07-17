@@ -36,26 +36,30 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input',
                         help="the input YAML configuration file")
+    parser.add_argument('-s', '--serial',
+                        help="run in serial mode",
+                        action="store_true")
     args = parser.parse_args()
 
     batchStart = time.time()
-        
-    Logger.logPrint("Starting batchprocess: "+args.input); 
-    Logger.logPrint("Start time:"+timeStr(batchStart)); 
-     
+
+    Logger.logPrint("Starting batchprocess: "+args.input)
+    Logger.logPrint("Start time:"+timeStr(batchStart))
+
     # load WormVideo to YAML configuration file
     with open(args.input, 'r') as f:
         wvs = wtc.loadWormVideos(f)
 
     # run analysis on regions
-    wtp.batchProcessVideos(wvs)
-    batchStop  = time.time()
-    Logger.logPrint("Start time:"+timeStr(batchStart)); 
-    Logger.logPrint("End time  :"+timeStr(batchStop)); 
-    Logger.logPrint("Total time:"+timeStr(batchStop-batchStart)); 
-    
-    # wv=wvs[0]
-    #wtp.processRegion(wv.regions[0])
+    if args.serial:
+        for wv in wvs:
+            wv.processRegions()
+    else:
+        wtp.batchProcessVideos(wvs)
+    batchStop = time.time()
+    Logger.logPrint("Start time:"+timeStr(batchStart))
+    Logger.logPrint("End time  :"+timeStr(batchStop))
+    Logger.logPrint("Total time:"+timeStr(batchStop-batchStart))
 
     return 'Success'
 
