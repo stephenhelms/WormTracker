@@ -4,7 +4,9 @@ from numpy import linalg as LA
 #from numba import jit
 from wormtracker import Logger
 
+
 class WormTrajectoryPostProcessor:
+    ## static properties!
     # bad frame settings
     filterByWidth = True
     filterByLength = True
@@ -13,15 +15,18 @@ class WormTrajectoryPostProcessor:
 
     # segment settings
     max_n_missing = 10
-    max_d_um = 10
+    max_d_um = 10.
     max_segment_frames = 500
     min_segment_size = 150
 
-    # head assignment settings
-    headMinSpeed = 40  # Min <s> for head assignment by leading end
+    # head assignment settings (centoid only method)
+    headMinSpeed = 40.  # Min <s> for head assignment by leading end
     headMinLeading = 1.3  # Min relative time leading for head
     headMinRelSpeed = 1.1  # Min relative end speed for head
     headMinRelBrightness = 0.2  # Min relative brightness for head
+
+    # head assignment settings (posture method)
+    headVarianceMinRatio = 1.1  # Min ratio of head to tail posture variation
 
     def __init__(self, h5obj, strain, name):
         self.h5obj = h5obj
@@ -52,23 +57,27 @@ class WormTrajectoryPostProcessor:
         self.Ctheta = None
         self.ltheta = None
         self.vtheta = None
+        self.usePosturalHeadAssignment = True
 
     def postProcess(self):
-        Logger.logPrint( 'Identifying bad frames...')
+        Logger.logPrint('Identifying bad frames...')
         self.identifyBadFrames()
-        Logger.logPrint( 'Extracting postural data...')
+        Logger.logPrint('Extracting postural data...')
         self.extractPosturalData()
-        Logger.logPrint( 'Fixing order of postural data...')
+        Logger.logPrint('Fixing order of postural data...')
         self.fixPosturalOrdering()
-        Logger.logPrint( 'Segmenting trajectory...')
+        Logger.logPrint('Segmenting trajectory...')
         self.segment()
-        Logger.logPrint( 'Assigning head...')
-        self.assignHeadTail()
-        Logger.logPrint( 'Ordering postural data head to tail...')
+        Logger.logPrint('Assigning head...')
+        if self.usePosturalHeadAssignment:
+            self.assignHeadTail()
+        else:
+            self.assignHeadTailCentroidOnly()
+        Logger.logPrint('Ordering postural data head to tail...')
         self.orderHeadTail()
-        Logger.logPrint( 'Calculating centroid motion variables...')
+        Logger.logPrint('Calculating centroid motion variables...')
         self.calculateCentroidMeasurements()
-        Logger.logPrint( 'Calculate postural measurements...')
+        Logger.logPrint('Calculating postural measurements...')
         self.calculatePosturalMeasurements()
 
     def identifyBadFrames(self):
@@ -91,7 +100,7 @@ class WormTrajectoryPostProcessor:
     def extractPosturalData(self):
         # import skeleton splines
         self.skeleton = self.h5ref['skeletonSpline'][...]
-        self.posture = ma.array(self.h5ref['posture'][...])
+        self.posture = self.h5ref['posture'][...]
         self.haveSkeleton = [np.any(skeleton > 0)
                              for skeleton in self.skeleton]
 
@@ -133,9 +142,8 @@ class WormTrajectoryPostProcessor:
 
         # flip data appropriately
         sel = self.haveSkeleton and flipped
-        self.skeleton[sel, :, :] = np.fliplr(np.squeeze(
-            self.skeleton[sel, :, :]))
-        self.posture[sel, :] = np.flipud(np.squeeze(self.posture[sel, :]))
+        self.skeleton[sel, :, :] = self.skeleton[sel, ::-1, :]
+        self.posture[sel, :] = self.posture[sel, ::-1]
 
     def segment(self):
         # break video into segments with matched skeletons
@@ -151,7 +159,7 @@ class WormTrajectoryPostProcessor:
             last_missing = False
             while (ii < self.maxFrameNumber and
                    ii - begin < self.max_segment_frames and
-                   (self.interframe_d[ii, 0] == np.NaN or
+                   (np.isnan(self.interframe_d[ii, 0]) or
                     np.min(self.interframe_d[ii, :]) < max_d)):
                 if not self.haveSkeleton[ii]:
                     n_missing += 1
@@ -166,10 +174,35 @@ class WormTrajectoryPostProcessor:
             segments.append([begin, ii])
 
         self.segments = [segment for segment in segments
-                         if np.sum(self.haveSkeleton[segment[0]:segment[1]]) >
+                         if segment[1] - segment[0] >
                          self.min_segment_size]
 
     def assignHeadTail(self):
+        flipSegment = np.zeros((len(self.segments),), dtype='bool')
+        segmentAssignMethod = -np.ones((len(self.segments),), dtype='int8')
+        npoints = round(self.posture.shape[1]*0.1)
+        for i, segment in enumerate(self.segments):
+            b = segment[0]
+            e = segment[1]
+            # calculate std at each posture position over segment
+            v = self.posture[b:e, :].std(axis=0)
+            # calculate total std for 10% from each end
+            vh = v[:npoints].sum()
+            vt = v[-npoints:].sum()
+            # head has higher variance
+            if vh/vt > self.headVarianceMinRatio:
+                # not flipped
+                segmentAssignMethod[i] = 3
+            elif vt/vh > self.headVarianceMinRatio:
+                # flipped
+                flipSegment[i] = True
+                segmentAssignMethod[i] = 3
+            else:
+                segmentAssignMethod[i] = 0  # can't assign
+        self.flipSegment = flipSegment
+        self.segmentAssignMethod = segmentAssignMethod
+
+    def assignHeadTailCentroidOnly(self):
         flipSegment = np.zeros((len(self.segments),), dtype='bool')
         segmentAssignMethod = -np.ones((len(self.segments),), dtype='int8')
         X = ma.array(self.h5ref['centroid'][...] / self.pixelsPerMicron)
@@ -266,15 +299,17 @@ class WormTrajectoryPostProcessor:
         self.Xtail[np.logical_or(np.logical_not(self.orientationFixed),
                                  self.badFrames), :] = ma.masked
 
-        self.skeleton[np.logical_not(self.orientationFixed), :, :] = ma.masked
-        self.posture[np.logical_not(self.orientationFixed), :] = ma.masked
-        missing = np.any(self.posture.mask, axis=1)
+        skeleton = ma.array(self.skeleton)
+        skeleton[np.logical_not(self.orientationFixed), :, :] = ma.masked
+        posture = ma.array(self.posture)
+        posture[np.logical_not(self.orientationFixed), :] = ma.masked
+        missing = np.any(posture.mask, axis=1)
         if np.all(missing):
             self.Ctheta = None
             self.ltheta = None
             self.vtheta = None
         else:
-            posture = self.posture[~missing, :].T
+            posture = posture[~missing, :].T
             self.Ctheta = np.cov(posture)
             self.ltheta, self.vtheta = LA.eig(self.Ctheta)
 
