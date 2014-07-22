@@ -14,6 +14,7 @@ wv = wvs[0]
 storeFile = wv.storeFile
 
 # load results
+import h5py
 import wormtracker.analysis as wta
 wta.configureMatplotLibStyle()  # make prettier plots
 f = h5py.File(storeFile, 'r')
