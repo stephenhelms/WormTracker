@@ -15,7 +15,7 @@ def acf(x, lags=500):
     if type(lags) is int:
         lags = range(lags)
 
-    C = ma.zeros((len(lags), 1))
+    C = ma.zeros((len(lags),))
     for i, l in enumerate(lags):
         if l == 0:
             C[i] = 1
@@ -43,3 +43,32 @@ def dotacf(x, lags=500):
         else:
             C[i] = (x[l:, :]*x[:-l, :]).sum(axis=1).mean()
     return C
+
+
+def drift(x, lags=500):
+    if type(lags) is int:
+        lags = xrange(lags)
+    mu = ma.zeros((len(lags),))
+    for i, lag in enumerate(lags):
+        if lag==0:
+            mu[i] = 0
+        else:
+            displacements = x[lag:] - x[:-lag]
+            mu[i] = displacements.mean()
+    return mu
+
+
+def unwrapma(x):
+    # Adapted from numpy unwrap, this version ignores missing data
+    idx = ma.array(np.arange(0,x.shape[0]), mask=x.mask)
+    idxc = idx.compressed()
+    xc = x.compressed()
+    dd = np.diff(xc)
+    ddmod = np.mod(dd+np.pi, 2*np.pi)-np.pi
+    ddmod[(ddmod==-np.pi) & (dd > 0)] = np.pi
+    phc_correct = ddmod - dd
+    phc_correct[np.abs(dd)<np.pi] = 0
+    ph_correct = np.zeros(x.shape)
+    ph_correct[idxc[1:]] = phc_correct
+    up = x + ph_correct.cumsum()
+    return up
