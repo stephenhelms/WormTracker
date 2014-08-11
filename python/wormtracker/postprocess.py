@@ -320,7 +320,8 @@ class WormTrajectoryPostProcessor:
         self.Xtail[np.logical_not(self.orientationFixed), :] = ma.masked
         self.psi = np.arctan2(self.Xhead[:, 1]-self.X[:, 1],
                               self.Xhead[:, 0]-self.X[:, 0])
-        self.dpsi = self.phi - self.psi
+        dpsi = self.phi - self.psi
+        self.dpsi = np.mod(dpsi+np.pi, 2*np.pi)-np.pi
         self.psi[np.logical_not(self.orientationFixed)] = ma.masked
         self.dpsi[np.logical_or(np.logical_not(self.orientationFixed),
                                 self.badFrames)] = ma.masked
