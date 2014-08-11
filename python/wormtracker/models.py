@@ -63,13 +63,13 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.tau_s = None
         self.D_s = None
 
-    def fit(self, trajectory, windowSize=None):
-        self.fitReversals(trajectory)
-        self.fitBearing(trajectory)
-        self.fitSpeed(trajectory)
+    def fit(self, trajectory, windowSize=None, plotFit=False):
+        self.fitReversals(trajectory, windowSize, plotFit)
+        self.fitBearing(trajectory, windowSize, plotFit)
+        self.fitSpeed(trajectory, windowSize, plotFit)
 
     def fitReversals(self, trajectory, windowSize=None, plotFit=False):
-        lags = np.arange(0, 115)
+        lags = np.arange(0, np.round(10.*trajectory.frameRate))
         if windowSize is None:
             dpsi = trajectory.getMaskedPosture(trajectory.dpsi)
             vdpsi = ma.array([np.cos(dpsi), np.sin(dpsi)]).T
@@ -112,11 +112,109 @@ class Helms2014CentroidModel(TrajectoryModel):
         Cinf = 4.*(0.5 - self.f_rev())**2
         return self._reversalFitFunction(tau, log_tau_eff, Cinf)
 
-    def fitBearing(self, trajectory):
-        raise NotImplemented()
+    def fitBearing(self, trajectory, windowSize, plotFit=False):
+        self.fitBearingDrift(trajectory, windowSize, plotFit)
+        self.fitBearingDiffusion(trajectory, windowSize, plotFit)
 
-    def fitSpeed(self, trajectory):
-        raise NotImplemented()
+    def fitBearingDrift(self, trajectory, windowSize=None, plotFit=False):
+        lags = np.linspace(0, np.round(50.*trajectory.frameRate), 200)
+        if windowSize is None:
+            psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
+            D = drift(psi, lags)
+        else:
+            def result(traj):
+                psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
+                return drift(psi, lags)
+
+            D = np.array([result(traj)
+                          for traj in trajectory.asWindows(windowSize)]).T
+            D = D.mean(axis=1)
+        tau = lags / trajectory.frameRate
+        p = np.polyfit(tau, D, 1)
+        self.k_psi = p[0]
+        if plotFit:
+            plt.plot(tau, D, 'k.')
+            plt.plot(tau, np.polyval(p, tau), 'r-')
+            plt.xlabel(r'$\tau$ (s)')
+            plt.ylabel(r'$\langle \psi(\tau) - \psi(0) \rangle$ (rad)')
+            textstr = '$k_\psi=%.2f$ rad/s'%(self.k_psi)
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            # place a text box in lower left in axes coords
+            ax = plt.gca()
+            ax.text(0.95, 0.05, textstr, transform=ax.transAxes, fontsize=14,
+                    horizontalalignment='right', verticalalignment='bottom', bbox=props)
+            plt.show()
+
+    def fitBearingDiffusion(self, trajectory, windowSize=None, plotFit=False):
+        lags = np.round(np.linspace(0, np.round(50.*trajectory.frameRate), 200)).astype(int)
+        if windowSize is None:
+            psi = trajectory.getMaskedPosture(trajectory.psi)
+            C = dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+        else:
+            def result(traj):
+                psi = traj.getMaskedPosture(traj.psi)
+                return dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+
+            C = np.array([result(traj)
+                          for traj in trajectory.asWindows(windowSize)]).T
+            C = C.mean(axis=1)
+        tau = lags / trajectory.frameRate
+        p, pcov = opt.curve_fit(self._bearingDiffusionFitFunction, tau, C, [-1.])
+        self.D_psi = 10**p[0]
+        if plotFit:
+            plt.plot(tau, C, 'k.')
+            plt.plot(tau, self._bearingDiffusionFitFunction(tau, p[0]), 'r-')
+            plt.xlabel(r'$\tau$ (s)')
+            plt.ylabel(r'$\langle \vec{\psi}(0) \cdot \vec{\psi}(\tau) \rangle$')
+            textstr = '$D_\psi=%.2f \mathrm{rad/s}^2$'%(self.D_psi)
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            # place a text box in lower left in axes coords
+            ax = plt.gca()
+            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=14,
+                    horizontalalignment='right', verticalalignment='top', bbox=props)
+            plt.show()
+
+    def _bearingDiffusionFitFunction(self, tau, log_D):
+        return np.exp(-(10**log_D)*tau)
+
+    def model_bearing_correlation(self, tau):
+        return self._bearingDiffusionFitFunction(tau, np.log10(self.D_psi))
+
+    def fitSpeed(self, trajectory, windowSize=None, plotFit=False):
+        lags = np.arange(0, np.round(10.*trajectory.frameRate))
+        if windowSize is None:
+            s = trajectory.getMaskedCentroid(trajectory.s)
+            C = s.var()*acf(s, lags)
+        else:
+            def result(traj):
+                s = traj.getMaskedCentroid(s)
+                return s.var()*acf(s)
+
+            C = np.array([result(traj)
+                          for traj in trajectory.asWindows(windowSize)]).T
+            C = C.mean(axis=1)
+        tau = lags / trajectory.frameRate
+        p, pcov = opt.curve_fit(self._speedFitFunction, tau, C, [0., 3.])
+        self.tau_s = 10**p[0]
+        self.D_s = 10**p[1]
+        if plotFit:
+            plt.plot(tau, C, 'k.')
+            plt.plot(tau, self._speedFitFunction(tau, p[0], p[1]), 'r-')
+            plt.xlabel(r'$\tau$ (s)')
+            plt.ylabel(r'$\langle \hat{s}(0) \cdot \hat{s}(\tau) \rangle$ (um/s)^2')
+            textstr = '$\\tau_s=%.2f$ s\n$D_s=%.2f$ s'%(self.tau_s, self.D_s)
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            # place a text box in lower left in axes coords
+            ax = plt.gca()
+            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=14,
+                    horizontalalignment='right', verticalalignment='top', bbox=props)
+            plt.show()
+
+    def _speedFitFunction(self, tau, log_tau, log_D):
+        return (10**log_D)*(10**log_tau)*np.exp(-tau/10**log_tau)
+
+    def model_s_correlation(self, tau):
+        return _speedFitFunction(tau, np.log10(self.tau_s), np.log10(self.D_s))
 
     def toParameterVector(self):
         return (np.array([self.tau_fwd,
