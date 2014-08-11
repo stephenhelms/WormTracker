@@ -8,6 +8,8 @@ import h5py
 import itertools
 import collections
 from abc import ABCMeta, abstractmethod
+import scipy.optimize as opt
+from tsstats import *
 
 
 class TrajectoryModel(object):
@@ -22,7 +24,7 @@ class TrajectoryModel(object):
         pass
 
     @abstractmethod
-    def fit(self, trajectory):
+    def fit(self, trajectory, windowSize=None):
         pass
 
     def simulate(self, storeFile, location, nTimes=10):
@@ -53,22 +55,62 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.tau_rev = None
 
         # bearing
-        self.mu_omega = None
+        self.k_psi = None
         self.D_psi = None
 
         # speed
         self.mu_s = None
         self.tau_s = None
         self.D_s = None
-        self.sigma_s = None
 
-    def fit(self, trajectory):
+    def fit(self, trajectory, windowSize=None):
         self.fitReversals(trajectory)
         self.fitBearing(trajectory)
         self.fitSpeed(trajectory)
 
-    def fitReversals(self, trajectory):
-        raise NotImplemented()
+    def fitReversals(self, trajectory, windowSize=None, plotFit=False):
+        lags = np.arange(0, 115)
+        if windowSize is None:
+            dpsi = trajectory.getMaskedPosture(trajectory.dpsi)
+            vdpsi = ma.array([np.cos(dpsi), np.sin(dpsi)]).T
+            C = dotacf(vdpsi, lags)
+        else:
+            def getVectorDpsi(traj):
+                dpsi = traj.getMaskedPosture(traj.dpsi)
+                vdpsi = ma.array([np.cos(dpsi), np.sin(dpsi)]).T
+                return vdpsi
+
+            C = np.array([dotacf(getVectorDpsi(traj), lags)
+                          for traj in trajectory.asWindows(windowSize)]).T
+            C = C.mean(axis=1)
+        tau = lags / trajectory.frameRate
+        p, pcov = opt.curve_fit(self._reversalFitFunction, tau, C, [0, 0.5])
+        f_rev = 0.5 - np.sqrt(p[1]/4)
+        self.tau_rev = 10**p[0]/(1.-f_rev)
+        self.tau_fwd = 10**p[0]/f_rev
+        if plotFit:
+            plt.plot(tau, C, 'k.')
+            plt.plot(tau, self._reversalFitFunction(tau, p[0], p[1]), 'r-')
+            plt.xlabel(r'$\tau$ (s)')
+            plt.ylabel(r'$\langle \vec{\Delta\psi}(0) \cdot \vec{\Delta\psi}(\tau) \rangle$')
+            textstr = '$\\tau_{\mathrm{rev}}=%.2f$ s\n$\\tau_{\mathrm{fwd}}=%.2f$ s'%(self.tau_rev, self.tau_fwd)
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            # place a text box in lower left in axes coords
+            ax = plt.gca()
+            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=14,
+                    horizontalalignment='right', verticalalignment='top', bbox=props)
+            plt.show()
+
+    def _reversalFitFunction(self, tau, log_tau_eff, Cinf):
+        return (1.-Cinf)*np.exp(-tau/10**log_tau_eff) + Cinf
+
+    def f_rev(self):
+        return self.tau_rev / (self.tau_fwd + self.tau_rev)
+
+    def model_dpsi_correlation(self, tau):
+        log_tau_eff = np.log10(1. / (1./self.tau_fwd + 1./self.tau_rev))
+        Cinf = 4.*(0.5 - self.f_rev())**2
+        return self._reversalFitFunction(tau, log_tau_eff, Cinf)
 
     def fitBearing(self, trajectory):
         raise NotImplemented()
@@ -79,16 +121,15 @@ class Helms2014CentroidModel(TrajectoryModel):
     def toParameterVector(self):
         return (np.array([self.tau_fwd,
                          self.tau_rev,
-                         self.mu_omega,
+                         self.k_psi,
                          self.D_psi,
                          self.mu_s,
                          self.tau_s,
-                         self.D_s,
-                         self.sigma_s]),
-                [r'\tau_{fwd}', r'\tau_{rev}', r'\mu_\omega',
-                 r'D_\psi', r'\mu_s', r'\tau_s', r'D_s', r'\sigma_s'],
+                         self.D_s]),
+                [r'\tau_{fwd}', r'\tau_{rev}', r'k_\psi',
+                 r'D_\psi', r'\mu_s', r'\tau_s', r'D_s'],
                 ['s', 's', 'rad/s', r'rad^2/s', r'\micro m/s',
-                 's', r'(\micro m/s)^2 s^{-1}', r'\micro m/s'])
+                 's', r'(\micro m/s)^2 s^{-1}'])
 
     def fromParameterVector(self, vector):
         # reversals
@@ -96,14 +137,13 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.tau_rev = vector[1]
 
         # bearing
-        self.mu_omega = vector[2]
+        self.k_psi = vector[2]
         self.D_psi = vector[3]
 
         # speed
         self.mu_s = vector[4]
         self.tau_s = vector[5]
         self.D_s = vector[6]
-        self.sigma_s = vector[7]
 
     def _doSimulation(self, storeFile, location):
         raise NotImplemented()
