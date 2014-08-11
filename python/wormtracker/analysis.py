@@ -15,6 +15,7 @@ import multiprocessing as multi
 import scipy.stats as ss
 from tsstats import *
 from stats import *
+from copy import deepcopy
 
 
 def configureMatplotLibStyle():
@@ -38,7 +39,7 @@ def pairwise(iterable):
 
 class WormTrajectory:
 
-    def __init__(self, h5obj, strain, wormID, videoFilePath=None):
+    def __init__(self, h5obj, strain, wormID, videoFilePath=None, frameRange=None):
         self.firstFrame = None
         self.h5obj = h5obj
         self.h5ref = self.h5obj['worms'][strain][wormID]
@@ -74,6 +75,59 @@ class WormTrajectory:
         self.posture = self.h5ref['posture']
         self.orientationFixed = self.h5ref['orientationFixed'][...]
         self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
+
+        if frameRange is not None:
+            self.frameRange = frameRange
+            self.clearAnalysisVariables()
+            self.isolateFrameRange(frameRange)
+        else:
+            self.frameRange = None
+
+    def __deepcopy__(self, memo):
+        traj = WormTrajectory(self.h5obj, deepcopy(self.strain, memo),
+                              deepcopy(self.wormID, memo),
+                              frameRange=deepcopy(self.frameRange, memo))
+        if self.videoFile is not None:
+            traj.videoFile = deepcopy(self.videoFile, memo)
+        return traj
+
+    def clearAnalysisVariables(self):
+        self.Ctheta = None
+        self.ltheta = None
+        self.vtheta = None
+
+    def isolateTimeRange(self, timeRange):
+        self.isolateFrameRange(np.round(timeRange*self.frameRate).astype(int))
+
+    def isolateFrameRange(self, frameRange):
+        if frameRange[0] < 0:
+            raise IndexError('Negative frame.')
+        if frameRange[1] > self.t.shape:
+            frameRange[1] = self.t.shape[0]
+        self.frameRange = frameRange
+
+        self.t = self.t[frameRange[0]:frameRange[1]]
+        self.X = self.X[frameRange[0]:frameRange[1], :]
+        self.Xhead = self.Xhead[frameRange[0]:frameRange[1], :]
+        self.v = self.v[frameRange[0]:frameRange[1], :]
+        self.s = self.s[frameRange[0]:frameRange[1]]
+        self.phi = self.phi[frameRange[0]:frameRange[1]]
+        self.psi = self.psi[frameRange[0]:frameRange[1]]
+        self.dpsi = self.dpsi[frameRange[0]:frameRange[1]]
+        self.badFrames = self.badFrames[frameRange[0]:frameRange[1]]
+        self.allCentroidMissing = np.all(self.badFrames)
+        self.skeleton = self.skeleton[frameRange[0]:frameRange[1], ...]
+        self.posture = self.posture[frameRange[0]:frameRange[1], :]
+        self.orientationFixed = self.orientationFixed[frameRange[0]:frameRange[1]]
+        self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
+
+    def asWindows(self, windowSize=100., overlap=0.5):
+        nWindows = int(np.round((self.t[-1] - self.t[0]) / windowSize / overlap))
+        for i in xrange(nWindows):
+            tRange = self.t[0] + i*windowSize*overlap + (0, windowSize)
+            traj = deepcopy(self)
+            traj.isolateTimeRange(tRange)
+            yield traj
 
     def readFirstFrame(self):
         if self.videoFile is None:

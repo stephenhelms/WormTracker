@@ -36,5 +36,10 @@ def circacf(x, lags=500):
 def dotacf(x, lags=500):
     if type(lags) is int:
         lags = xrange(lags)
-    return [np.mean(np.vdot(x[l:, :], x[:-l, :]))
-            for l in lags]
+    C = ma.zeros((len(lags),))
+    for i, l in enumerate(lags):
+        if l == 0:
+            C[i] = (x*x).sum(axis=1).mean()
+        else:
+            C[i] = (x[l:, :]*x[:-l, :]).sum(axis=1).mean()
+    return C
