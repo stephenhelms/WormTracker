@@ -38,7 +38,6 @@ def pairwise(iterable):
 
 
 class WormTrajectory:
-
     def __init__(self, h5obj, strain, wormID, videoFilePath=None, frameRange=None):
         self.firstFrame = None
         self.h5obj = h5obj
@@ -76,6 +75,10 @@ class WormTrajectory:
         self.orientationFixed = self.h5ref['orientationFixed'][...]
         self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
 
+        self.revBoundaries = None
+        self.nearRev = np.zeros(self.t.shape, 'bool')
+        self.state = None
+
         if frameRange is not None:
             self.frameRange = frameRange
             self.clearAnalysisVariables()
@@ -95,6 +98,10 @@ class WormTrajectory:
         self.Ctheta = None
         self.ltheta = None
         self.vtheta = None
+
+        self.revBoundaries = None
+        self.nearRev = None
+        self.state = None
 
     def isolateTimeRange(self, timeRange):
         self.isolateFrameRange(np.round(timeRange*self.frameRate).astype(int))
@@ -128,6 +135,53 @@ class WormTrajectory:
             traj = deepcopy(self)
             traj.isolateTimeRange(tRange)
             yield traj
+
+    def identifyReversals(self, transitionWindow=2.):
+        dpsi = self.getMaskedPosture(self.dpsi)
+        rev = np.abs(dpsi)>np.pi/2.
+
+        ii = 1
+        inRev = False
+        state = np.zeros(self.t.shape, int)
+        state[~rev] = 1
+        state[rev] = 2
+        state[rev.mask] = 0
+        self.state = state
+
+        revBoundaries = ma.empty((1,2),int)
+        for j in xrange(1,self.t.shape[0]-2):
+            if not inRev:
+                if (state[j]==2 & state[j+1]==2 |
+                    state[j]==2 & state[j+1]==0 & state[j+2]==2):
+                    if state[j-1] == 0:
+                        revBoundaries[ii,0] = ma.masked
+                    else:
+                        revBoundaries[ii,0] = j
+                    inRev = True
+            else:
+                if (state[j]==1 & state[j+1]==1 |
+                    state[j]==1 & state[j+1]==0 & state[j+2]==1):
+                    revBoundaries[ii,1] = j
+                    inRev = False
+                    ii = ii+1
+                elif (state[j]==1 & state[j+1]==0 & state[j+2]==0):
+                    revBoundaries[ii,1] = j
+                    inRev = False
+                    ii = ii+1
+                elif (state[j]==0 & state[j+1]==0):
+                    revBoundaries[ii,1] = ma.masked
+                    inRev=False
+                    ii = ii+1
+
+        if revBoundaries[-1,1] == 0:
+            revBoundaries[-1,1] = ma.masked
+        self.revBoundaries = revBoundaries
+
+        revEdges = self.revBoundaries[:].compressed()
+        for boundary in revEdges:
+            self.nearRev[(self.t>boundary-transitionWindow/2.) |
+                         (self.t<boundary+transitionWindow/2.)] = True
+
 
     def readFirstFrame(self):
         if self.videoFile is None:
