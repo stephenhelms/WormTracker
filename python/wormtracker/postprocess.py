@@ -12,6 +12,8 @@ class WormTrajectoryPostProcessor:
     filterByLength = True
     widthThreshold = (0.5, 1.5)
     lengthThreshold = (0.8, 1.2)
+    filterBySpeed = True
+    maxSpeed = 1000
 
     # segment settings
     max_n_missing = 10
@@ -27,6 +29,10 @@ class WormTrajectoryPostProcessor:
 
     # head assignment settings (posture method)
     headVarianceMinRatio = 1.1  # Min ratio of head to tail posture variation
+
+    # smoothing
+    useSmoothingFilterDerivatives = True
+    filterWindow = 1.  # smoothing filter window size
 
     def __init__(self, h5obj, strain, name):
         self.h5obj = h5obj
@@ -95,6 +101,12 @@ class WormTrajectoryPostProcessor:
                               self.lengthThreshold[0]*self.length,
                               self.lengths >
                               self.lengthThreshold[1]*self.length))
+        if self.filterBySpeed:
+            v = ma.zeros(self.X.shape)
+            v[1:-1] = (self.X[2:, :] - self.X[0:-2])/(2.0/self.frameRate)
+            instSpeed = np.sqrt(np.sum(np.power(v, 2), axis=1))
+            badFrames = np.logical_or(badFrames,
+                instSpeed > self.maxSpeed)
         self.badFrames = badFrames
 
     def extractPosturalData(self):
@@ -270,7 +282,25 @@ class WormTrajectoryPostProcessor:
 
     def calculateCentroidMeasurements(self):
         self.X[self.badFrames, :] = ma.masked
-        self.v[1:-1] = (self.X[2:, :] - self.X[0:-2])/(2.0/self.frameRate)
+        if not self.useSmoothingFilterDerivatives:
+            self.v[1:-1] = (self.X[2:, :] - self.X[0:-2])/(2.0/self.frameRate)
+        else:
+            # use a cubic polynomial filter to estimate the velocity
+            self.v = ma.zeros(self.X.shape)
+            halfWindow = int(np.round(self.filterWindow/2.*self.frameRate))
+            for i in xrange(halfWindow, self.v.shape[0]-halfWindow):
+                start = i-halfWindow
+                mid = i
+                finish = i+halfWindow
+                if not np.any(self.X.mask[start:finish,:]):
+                    px = np.polyder(np.polyfit(self.t[start:finish]-self.t[mid],
+                                               self.X[start:finish, 0], 3))
+                    py = np.polyder(np.polyfit(self.t[start:finish]-self.t[mid],
+                                               self.X[start:finish, 1], 3))
+                    self.v[i,:] = [np.polyval(px, 0), np.polyval(py, 0)]
+                else:
+                    self.v[i,:] = ma.masked
+
         self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
         self.phi = np.arctan2(self.v[:, 1], self.v[:, 0])
         self.t[self.badFrames] = ma.masked
