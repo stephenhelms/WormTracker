@@ -104,7 +104,7 @@ class WormTrajectory:
         self.state = None
 
     def isolateTimeRange(self, timeRange):
-        self.isolateFrameRange(np.round(timeRange*self.frameRate).astype(int))
+        self.isolateFrameRange(np.round(np.array(timeRange)*self.frameRate).astype(int))
 
     def isolateFrameRange(self, frameRange):
         if frameRange[0] < 0:
@@ -246,6 +246,36 @@ class WormTrajectory:
         X = self.getMaskedCentroid(self.X)
         plt.plot(X[:, 0], X[:, 1], '-', color=color)
         plt.hold(True)
+        if self.foodCircle is not None:
+            circle = plt.Circle(self.foodCircle[0:2],
+                                radius=self.foodCircle[-1],
+                                color='r', fill=False)
+            plt.gca().add_patch(circle)
+        plt.xlim((0, 10000))
+        plt.ylim((0, 10000))
+        plt.xlabel('x (um)')
+        plt.ylabel('y (um)')
+        plt.gca().set_aspect('equal')
+        if showPlot:
+            plt.show()
+
+    def plotTrajectoryVectors(self, showFrame=True, showPlot=True):
+        if showFrame and self.firstFrame is not None:
+            plt.imshow(self.firstFrame, plt.gray(),
+                       origin='lower',
+                       extent=(0,
+                               self.firstFrame.shape[1]/self.pixelsPerMicron,
+                               0,
+                               self.firstFrame.shape[0]/self.pixelsPerMicron))
+            plt.hold(True)
+        X = self.getMaskedCentroid(self.X)
+        phi = self.getMaskedCentroid(self.phi)
+        psi = self.getMaskedPosture(self.psi)
+        s = self.getMaskedCentroid(self.s)
+        plt.quiver(X[:,0], X[:,1], (s+10.)*np.cos(phi), (s+10.)*np.sin(phi), color='k')
+        psi = self.getMaskedPosture(self.psi)
+        mu = s.mean()
+        plt.quiver(X[:,0], X[:,1], mu*np.cos(psi), mu*np.sin(psi), color='r')
         if self.foodCircle is not None:
             circle = plt.Circle(self.foodCircle[0:2],
                                 radius=self.foodCircle[-1],
