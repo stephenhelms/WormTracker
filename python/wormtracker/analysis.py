@@ -275,10 +275,12 @@ class WormTrajectory:
         phi = self.getMaskedCentroid(self.phi)
         psi = self.getMaskedPosture(self.psi)
         s = self.getMaskedCentroid(self.s)
-        plt.quiver(X[:,0], X[:,1], (s+10.)*np.cos(phi), (s+10.)*np.sin(phi), color='k')
+        plt.quiver(X[:,0], X[:,1], (s+10.)*np.cos(phi), (s+10.)*np.sin(phi),
+                   color='k', units='xy')
         psi = self.getMaskedPosture(self.psi)
         mu = s.mean()
-        plt.quiver(X[:,0], X[:,1], mu*np.cos(psi), mu*np.sin(psi), color='r')
+        plt.quiver(X[:,0], X[:,1], mu*np.cos(psi), mu*np.sin(psi),
+                   color='r', units='xy')
         if self.foodCircle is not None:
             circle = plt.Circle(self.foodCircle[0:2],
                                 radius=self.foodCircle[-1],
