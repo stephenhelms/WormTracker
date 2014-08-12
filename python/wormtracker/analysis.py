@@ -179,7 +179,7 @@ class WormTrajectory:
 
         revEdges = self.revBoundaries[:].compressed()
         for boundary in revEdges:
-            self.nearRev[(self.t>boundary-transitionWindow/2.) |
+            self.nearRev[(self.t>boundary-transitionWindow/2.) &
                          (self.t<boundary+transitionWindow/2.)] = True
 
 
