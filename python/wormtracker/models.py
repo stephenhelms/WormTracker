@@ -181,25 +181,7 @@ class Helms2014CentroidModel(TrajectoryModel):
         return self._bearingDiffusionFitFunction(tau, np.log10(self.D_psi))
 
     def fitSpeed(self, trajectory, windowSize=None, plotFit=False):
-        if trajectory.revBoundaries is None:
-            trajectory.identifyReversals()
-
-        lags = np.arange(0, np.round(10.*trajectory.frameRate))
-        if windowSize is None:
-            s = trajectory.getMaskedCentroid(trajectory.s)
-            s[trajectory.nearRev] = ma.masked
-            C = s.var()*acf(s, lags)
-        else:
-            def result(traj):
-                traj.identifyReversals()
-                s = traj.getMaskedCentroid(traj.s)
-                s[traj.nearRev] = ma.masked
-                return s.var()*acf(s, lags)
-
-            C = np.array([result(traj)
-                          for traj in trajectory.asWindows(windowSize)]).T
-            C = C.mean(axis=1)
-        tau = lags / trajectory.frameRate
+        tau, C = trajectory.getSpeedAutocorrelation(maxT=10., windowSize=windowSize)
         p, pcov = opt.curve_fit(self._speedFitFunction, tau, C, [0., 3.])
         self.tau_s = 10**p[0]
         self.D_s = 10**p[1]
@@ -211,7 +193,7 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.plot(tau, self._speedFitFunction(tau, p[0], p[1]), 'r-')
             plt.xlabel(r'$\tau$ (s)')
             plt.ylabel(r'$\langle \hat{s}(0) \cdot \hat{s}(\tau) \rangle \mathrm{(um/s)}^2$')
-            textstr = '$\\tau_s=%.2f$ s\n$D_s=%.2f$ s'%(self.tau_s, self.D_s)
+            textstr = '$\\tau_s=%.2f \mathrm{s}$\n$D_s=%.2f \mathrm{(um/s)}^2/\mathrm{s}$'%(self.tau_s, self.D_s)
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             # place a text box in lower left in axes coords
             ax = plt.gca()
