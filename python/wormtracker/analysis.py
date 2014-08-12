@@ -38,7 +38,6 @@ def pairwise(iterable):
 
 
 class WormTrajectory:
-
     def __init__(self, h5obj, strain, wormID, videoFilePath=None, frameRange=None):
         self.firstFrame = None
         self.h5obj = h5obj
@@ -76,6 +75,10 @@ class WormTrajectory:
         self.orientationFixed = self.h5ref['orientationFixed'][...]
         self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
 
+        self.revBoundaries = None
+        self.nearRev = np.zeros(self.t.shape, 'bool')
+        self.state = None
+
         if frameRange is not None:
             self.frameRange = frameRange
             self.clearAnalysisVariables()
@@ -96,8 +99,12 @@ class WormTrajectory:
         self.ltheta = None
         self.vtheta = None
 
+        self.revBoundaries = None
+        self.nearRev = None
+        self.state = None
+
     def isolateTimeRange(self, timeRange):
-        self.isolateFrameRange(np.round(timeRange*self.frameRate).astype(int))
+        self.isolateFrameRange(np.round(np.array(timeRange)*self.frameRate).astype(int))
 
     def isolateFrameRange(self, frameRange):
         if frameRange[0] < 0:
@@ -128,6 +135,53 @@ class WormTrajectory:
             traj = deepcopy(self)
             traj.isolateTimeRange(tRange)
             yield traj
+
+    def identifyReversals(self, transitionWindow=2.):
+        dpsi = self.getMaskedPosture(self.dpsi)
+        rev = np.abs(dpsi)>np.pi/2.
+
+        ii = 1
+        inRev = False
+        state = np.zeros(self.t.shape, int)
+        state[~rev] = 1
+        state[rev] = 2
+        state[rev.mask] = 0
+        self.state = state
+
+        revBoundaries = ma.empty((1,2),int)
+        for j in xrange(1,self.t.shape[0]-2):
+            if not inRev:
+                if (state[j]==2 & state[j+1]==2 |
+                    state[j]==2 & state[j+1]==0 & state[j+2]==2):
+                    if state[j-1] == 0:
+                        revBoundaries[ii,0] = ma.masked
+                    else:
+                        revBoundaries[ii,0] = j
+                    inRev = True
+            else:
+                if (state[j]==1 & state[j+1]==1 |
+                    state[j]==1 & state[j+1]==0 & state[j+2]==1):
+                    revBoundaries[ii,1] = j
+                    inRev = False
+                    ii = ii+1
+                elif (state[j]==1 & state[j+1]==0 & state[j+2]==0):
+                    revBoundaries[ii,1] = j
+                    inRev = False
+                    ii = ii+1
+                elif (state[j]==0 & state[j+1]==0):
+                    revBoundaries[ii,1] = ma.masked
+                    inRev=False
+                    ii = ii+1
+
+        if revBoundaries[-1,1] == 0:
+            revBoundaries[-1,1] = ma.masked
+        self.revBoundaries = revBoundaries
+
+        revEdges = self.revBoundaries[:].compressed()
+        for boundary in revEdges:
+            self.nearRev[(self.t>boundary-transitionWindow/2.) |
+                         (self.t<boundary+transitionWindow/2.)] = True
+
 
     def readFirstFrame(self):
         if self.videoFile is None:
@@ -192,6 +246,36 @@ class WormTrajectory:
         X = self.getMaskedCentroid(self.X)
         plt.plot(X[:, 0], X[:, 1], '-', color=color)
         plt.hold(True)
+        if self.foodCircle is not None:
+            circle = plt.Circle(self.foodCircle[0:2],
+                                radius=self.foodCircle[-1],
+                                color='r', fill=False)
+            plt.gca().add_patch(circle)
+        plt.xlim((0, 10000))
+        plt.ylim((0, 10000))
+        plt.xlabel('x (um)')
+        plt.ylabel('y (um)')
+        plt.gca().set_aspect('equal')
+        if showPlot:
+            plt.show()
+
+    def plotTrajectoryVectors(self, showFrame=True, showPlot=True):
+        if showFrame and self.firstFrame is not None:
+            plt.imshow(self.firstFrame, plt.gray(),
+                       origin='lower',
+                       extent=(0,
+                               self.firstFrame.shape[1]/self.pixelsPerMicron,
+                               0,
+                               self.firstFrame.shape[0]/self.pixelsPerMicron))
+            plt.hold(True)
+        X = self.getMaskedCentroid(self.X)
+        phi = self.getMaskedCentroid(self.phi)
+        psi = self.getMaskedPosture(self.psi)
+        s = self.getMaskedCentroid(self.s)
+        plt.quiver(X[:,0], X[:,1], (s+10.)*np.cos(phi), (s+10.)*np.sin(phi), color='k')
+        psi = self.getMaskedPosture(self.psi)
+        mu = s.mean()
+        plt.quiver(X[:,0], X[:,1], mu*np.cos(psi), mu*np.sin(psi), color='r')
         if self.foodCircle is not None:
             circle = plt.Circle(self.foodCircle[0:2],
                                 radius=self.foodCircle[-1],
