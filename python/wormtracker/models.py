@@ -202,6 +202,9 @@ class Helms2014CentroidModel(TrajectoryModel):
         p, pcov = opt.curve_fit(self._speedFitFunction, tau, C, [0., 3.])
         self.tau_s = 10**p[0]
         self.D_s = 10**p[1]
+        s = trajectory.getMaskedCentroid(trajectory.s)
+        s[trajectory.nearRev] = ma.masked
+        self.mu_s = s.mean()
         if plotFit:
             plt.plot(tau, C, 'k.')
             plt.plot(tau, self._speedFitFunction(tau, p[0], p[1]), 'r-')
