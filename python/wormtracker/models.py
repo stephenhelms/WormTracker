@@ -181,13 +181,18 @@ class Helms2014CentroidModel(TrajectoryModel):
         return self._bearingDiffusionFitFunction(tau, np.log10(self.D_psi))
 
     def fitSpeed(self, trajectory, windowSize=None, plotFit=False):
+        if trajectory.revBoundaries is None:
+            trajectory.identifyReversals()
+
         lags = np.arange(0, np.round(10.*trajectory.frameRate))
         if windowSize is None:
             s = trajectory.getMaskedCentroid(trajectory.s)
+            s[trajectory.nearRev] = ma.masked
             C = s.var()*acf(s, lags)
         else:
             def result(traj):
                 s = traj.getMaskedCentroid(s)
+                s[trajectory.nearRev] = ma.masked
                 return s.var()*acf(s)
 
             C = np.array([result(traj)
