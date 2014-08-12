@@ -383,7 +383,7 @@ class WormTrajectory:
     def getBodyBearingAutocorrelation(self, maxT=50., windowSize=100.):
         lags = np.round(np.linspace(0, np.round(maxT*self.frameRate), 200)).astype(int)
         if windowSize is None:
-            psi = trajectory.getMaskedPosture(self.psi)
+            psi = self.getMaskedPosture(self.psi)
             C = dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
         else:
             def result(traj):
