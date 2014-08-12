@@ -291,7 +291,7 @@ class WormTrajectoryPostProcessor:
             for i in xrange(halfWindow, self.v.shape[0]-halfWindow):
                 start = i-halfWindow
                 mid = i
-                finish = i+halfWindow
+                finish = i+halfWindow+1
                 if not np.any(self.X.mask[start:finish,:]):
                     px = np.polyder(np.polyfit(self.t[start:finish]-self.t[mid],
                                                self.X[start:finish, 0], 3))
@@ -318,9 +318,10 @@ class WormTrajectoryPostProcessor:
         self.Xtail = ((self.Xtail + self.h5ref['boundingBox'][:, :2]) /
                       self.pixelsPerMicron)
         self.Xtail[np.logical_not(self.orientationFixed), :] = ma.masked
-        self.psi = np.arctan2(self.Xhead[:, 1]-self.X[:, 1],
-                              self.Xhead[:, 0]-self.X[:, 0])
-        self.dpsi = self.phi - self.psi
+        self.psi = np.arctan2(self.Xhead[:, 0]-self.X[:, 0],
+                              self.Xhead[:, 1]-self.X[:, 1])
+        dpsi = self.phi - self.psi
+        self.dpsi = np.mod(dpsi+np.pi, 2*np.pi)-np.pi
         self.psi[np.logical_not(self.orientationFixed)] = ma.masked
         self.dpsi[np.logical_or(np.logical_not(self.orientationFixed),
                                 self.badFrames)] = ma.masked
