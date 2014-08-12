@@ -94,16 +94,16 @@ class AnimatedWormTrajectoryWithImage:
         if not self.phi.mask[frameNumber]:
             self.phiQuiver.set_offsets([xc, yc])
             self.phiQuiver.set_UVC(
-                np.sin(self.phi[frameNumber])*self.quiverLength,
-                np.cos(self.phi[frameNumber])*self.quiverLength)
+                np.cos(self.phi[frameNumber])*self.quiverLength,
+                np.sin(self.phi[frameNumber])*self.quiverLength)
         else:
             self.phiQuiver.set_offsets([0,0])
             self.phiQuiver.set_UVC(0,0)
         if not self.psi.mask[frameNumber]:
             self.psiQuiver.set_offsets([xc, yc])
             self.psiQuiver.set_UVC(
-                np.sin(self.psi[frameNumber])*self.quiverLength,
-                np.cos(self.psi[frameNumber])*self.quiverLength)
+                np.cos(self.psi[frameNumber])*self.quiverLength,
+                np.sin(self.psi[frameNumber])*self.quiverLength)
         else:
             self.psiQuiver.set_offsets([0,0])
             self.psiQuiver.set_UVC(0,0)
