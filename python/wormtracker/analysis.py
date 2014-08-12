@@ -100,7 +100,7 @@ class WormTrajectory:
         self.vtheta = None
 
         self.revBoundaries = None
-        self.nearRev = None
+        self.nearRev = np.zeros(self.t.shape, 'bool')
         self.state = None
 
     def isolateTimeRange(self, timeRange):
@@ -128,6 +128,8 @@ class WormTrajectory:
         self.orientationFixed = self.orientationFixed[frameRange[0]:frameRange[1]]
         self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
 
+        self.clearAnalysisVariables()
+
     def asWindows(self, windowSize=100., overlap=0.5):
         nWindows = int(np.round((self.t[-1] - self.t[0]) / windowSize / overlap))
         for i in xrange(nWindows):
@@ -145,7 +147,8 @@ class WormTrajectory:
         state = np.zeros(self.t.shape, int)
         state[~rev] = 1
         state[rev] = 2
-        state[rev.mask] = 0
+        if np.any(rev.mask):
+            state[rev.mask] = 0
         self.state = state
 
         revBoundaries = ma.empty((1,2),int)

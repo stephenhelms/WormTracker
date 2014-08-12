@@ -191,9 +191,10 @@ class Helms2014CentroidModel(TrajectoryModel):
             C = s.var()*acf(s, lags)
         else:
             def result(traj):
-                s = traj.getMaskedCentroid(s)
-                s[trajectory.nearRev] = ma.masked
-                return s.var()*acf(s)
+                traj.identifyReversals()
+                s = traj.getMaskedCentroid(traj.s)
+                s[traj.nearRev] = ma.masked
+                return s.var()*acf(s, lags)
 
             C = np.array([result(traj)
                           for traj in trajectory.asWindows(windowSize)]).T
@@ -209,7 +210,7 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.plot(tau, C, 'k.')
             plt.plot(tau, self._speedFitFunction(tau, p[0], p[1]), 'r-')
             plt.xlabel(r'$\tau$ (s)')
-            plt.ylabel(r'$\langle \hat{s}(0) \cdot \hat{s}(\tau) \rangle$ (um/s)^2')
+            plt.ylabel(r'$\langle \hat{s}(0) \cdot \hat{s}(\tau) \rangle \mathrm{(um/s)}^2$')
             textstr = '$\\tau_s=%.2f$ s\n$D_s=%.2f$ s'%(self.tau_s, self.D_s)
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             # place a text box in lower left in axes coords
