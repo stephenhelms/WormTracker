@@ -16,11 +16,14 @@ class AnimatedWormTrajectoryWithImage:
         self.badFrames = self.trajectory.badFrames
         self.X = self.trajectory.getMaskedCentroid(self.trajectory.X)
         self.Xhead = self.trajectory.getMaskedPosture(self.trajectory.Xhead)
+        self.phi = self.trajectory.getMaskedCentroid(self.trajectory.phi)
+        self.psi = self.trajectory.getMaskedPosture(self.trajectory.psi)
         self.skeleton = ma.array(self.trajectory.skeleton[:, 1:-1, :])
         self.skeleton[~self.trajectory.orientationFixed, :, :] = ma.masked
         self.posture = self.trajectory.getMaskedPosture(self.trajectory.posture)
         self.pixelsPerMicron = self.trajectory.pixelsPerMicron
         self.frameRate = self.trajectory.frameRate
+        self.quiverLength = 300.*self.pixelsPerMicron
 
     def initialView(self):
         self.axTraj = plt.subplot(1, 2, 1)
@@ -52,6 +55,12 @@ class AnimatedWormTrajectoryWithImage:
                                                vmax=3)
         self.centroid, = self.axWorm.plot([], [], 'ro')
         self.head, = self.axWorm.plot([], [], 'rs')
+        self.phiQuiver = self.axWorm.quiver(0,0,0,0, color='r',
+                                            angles='xy', scale_units='xy',
+                                            scale=1)
+        self.psiQuiver = self.axWorm.quiver(0,0,0,0, color='b',
+                                            angles='xy', scale_units='xy',
+                                            scale=1)
         plt.xticks([])
         plt.yticks([])
         #self.
@@ -76,11 +85,29 @@ class AnimatedWormTrajectoryWithImage:
         self.postureSkel.set_array(self.posture[frameNumber, :])
         self.postureSkel.set_clim(-1, 1)
         self.postureSkel.set_cmap(plt.get_cmap('PuOr'))
-        self.centroid.set_xdata(self.X[frameNumber, 1]*self.pixelsPerMicron - bb[1])
-        self.centroid.set_ydata(self.X[frameNumber, 0]*self.pixelsPerMicron - bb[0])
+        xc = self.X[frameNumber, 1]*self.pixelsPerMicron - bb[1]
+        self.centroid.set_xdata(xc)
+        yc = self.X[frameNumber, 0]*self.pixelsPerMicron - bb[0]
+        self.centroid.set_ydata(yc)
         self.head.set_xdata(self.Xhead[frameNumber, 1]*self.pixelsPerMicron - bb[1])
         self.head.set_ydata(self.Xhead[frameNumber, 0]*self.pixelsPerMicron - bb[0])
-        plt.title(str(frameNumber/self.frameRate) + ' s')
+        if not self.phi.mask[frameNumber]:
+            self.phiQuiver.set_offsets([xc, yc])
+            self.phiQuiver.set_UVC(
+                np.sin(self.phi[frameNumber])*self.quiverLength,
+                np.cos(self.phi[frameNumber])*self.quiverLength)
+        else:
+            self.phiQuiver.set_offsets([0,0])
+            self.phiQuiver.set_UVC(0,0)
+        if not self.psi.mask[frameNumber]:
+            self.psiQuiver.set_offsets([xc, yc])
+            self.psiQuiver.set_UVC(
+                np.sin(self.psi[frameNumber])*self.quiverLength,
+                np.cos(self.psi[frameNumber])*self.quiverLength)
+        else:
+            self.psiQuiver.set_offsets([0,0])
+            self.psiQuiver.set_UVC(0,0)
+        plt.title('%i: %.2f s'%(frameNumber,frameNumber/self.frameRate))
 
     def getWormImage(self, frameNumber):
         bb = self.trajectory.h5ref['boundingBox'][frameNumber,
