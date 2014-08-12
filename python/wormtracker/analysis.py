@@ -378,18 +378,28 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
-    def getBodyBearingAutocorrelation(self, maxT=100):
-        n = int(np.round(maxT*self.frameRate))
-        tau = range(n)/self.frameRate
-        psi = self.getMaskedPosture(self.psi)
-        C = circacf(psi, n)
+    def getBodyBearingAutocorrelation(self, maxT=50., windowSize=100.):
+        lags = np.round(np.linspace(0, np.round(maxT*self.frameRate), 200)).astype(int)
+        if windowSize is None:
+            psi = trajectory.getMaskedPosture(self.psi)
+            C = dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+        else:
+            def result(traj):
+                psi = traj.getMaskedPosture(traj.psi)
+                return dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+
+            C = np.array([result(traj)
+                          for traj in self.asWindows(windowSize)]).T
+            C = C.mean(axis=1)
+        tau = lags / self.frameRate
         return tau, C
 
-    def plotBodyBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):
-        tau, C = self.getBodyBearingAutocorrelation(maxT)
+    def plotBodyBearingAutocorrelation(self, maxT=50., windowSize=100.,
+                                       color='k', showPlot=True):
+        tau, C = self.getBodyBearingAutocorrelation(maxT, windowSize=windowSize)
         plt.plot(tau, C, '-', color=color)
-        plt.xlabel(r'$\tau (s)$')
-        plt.ylabel(r'$\langle \cos \left[ \psi(t+\tau) - \psi(t) \right] \rangle$')
+        plt.xlabel(r'$\tau \mathrm{(s)}$')
+        plt.ylabel(r'$\langle \vec{\psi}(0) \cdot \vec{\psi}(\tau) \rangle$')
         if showPlot:
             plt.show()
 
