@@ -316,26 +316,36 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
-    def getSpeedDistribution(self, bins=None, useKernelDensity=True):
-        if bins is None:
-            bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
-
+    def getSpeedDistribution(self, bins, useKernelDensity=True,
+                             ignoreReversalTransition=True):
         s = self.getMaskedCentroid(self.s)
+        if ignoreReversalTransition:
+            if self.revBoundaries is None:
+                self.identifyReversals()
+            s[self.nearRev] = ma.masked
         if not useKernelDensity:
             out = np.histogram(s.compressed(), bins,
                                density=True)[0]
         else:
-            kd = ss.gaussian_kde(self.getMaskedCentroid(self.s).compressed())
+            kd = ss.gaussian_kde(s.compressed())
             out = kd.evaluate(bins)
         return out
 
-    def plotSpeedDistribution(self, bins=None, color='k', showPlot=True):
-        if bins is None:
-            bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
-        s = self.getMaskedCentroid(self.s)
-        plt.hist(s.compressed(), bins, normed=True, facecolor=color)
+    def plotSpeedDistribution(self, bins=None, color='k', useKernelDensity=True,
+                              ignoreReversalTransition=True, showPlot=True):
+        if not useKernelDensity:
+            if bins is None:
+                bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
+            s = self.getMaskedCentroid(self.s)
+            plt.hist(s.compressed(), bins, normed=True, facecolor=color)
+        else:
+            if bins is None:
+                bins = np.linspace(0,500,500)
+            D = self.getSpeedDistribution(bins,
+                    ignoreReversalTransition=ignoreReversalTransition)
+            plt.plot(bins, D, 'k-')
         plt.xlabel('Speed (um/s)')
-        plt.ylabel('Probability')
+        plt.ylabel('Probability Density')
         if showPlot:
             plt.show()
 
