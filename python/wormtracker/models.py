@@ -146,19 +146,8 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.show()
 
     def fitBearingDiffusion(self, trajectory, windowSize=None, plotFit=False):
-        lags = np.round(np.linspace(0, np.round(50.*trajectory.frameRate), 200)).astype(int)
-        if windowSize is None:
-            psi = trajectory.getMaskedPosture(trajectory.psi)
-            C = dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
-        else:
-            def result(traj):
-                psi = traj.getMaskedPosture(traj.psi)
-                return dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
-
-            C = np.array([result(traj)
-                          for traj in trajectory.asWindows(windowSize)]).T
-            C = C.mean(axis=1)
-        tau = lags / trajectory.frameRate
+        tau, C = trajectory.getBodyBearingAutocorrelation(maxT=50.,
+                                                          windowSize=windowSize)
         p, pcov = opt.curve_fit(self._bearingDiffusionFitFunction, tau, C, [-1.])
         self.D_psi = 10**p[0]
         if plotFit:
@@ -166,7 +155,7 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.plot(tau, self._bearingDiffusionFitFunction(tau, p[0]), 'r-')
             plt.xlabel(r'$\tau$ (s)')
             plt.ylabel(r'$\langle \vec{\psi}(0) \cdot \vec{\psi}(\tau) \rangle$')
-            textstr = '$D_\psi=%.2f \mathrm{rad/s}^2$'%(self.D_psi)
+            textstr = '$D_\psi=%.2f \mathrm{rad}^2/\mathrm{s}$'%(self.D_psi)
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             # place a text box in lower left in axes coords
             ax = plt.gca()
