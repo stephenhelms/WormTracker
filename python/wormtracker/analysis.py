@@ -349,18 +349,32 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
-    def getSpeedAutocorrelation(self, maxT=100):
-        n = int(np.round(maxT*self.frameRate))
-        tau = range(n)/self.frameRate
-        s = self.getMaskedCentroid(self.s)
-        C = acf(s, n)
+    def getSpeedAutocorrelation(self, maxT=10., windowSize=100.):
+        lags = np.arange(0, np.round(maxT*self.frameRate))
+        if windowSize is None:
+            s = self.getMaskedCentroid(self.s)
+            s[self.nearRev] = ma.masked
+            C = s.var()*acf(s, lags)
+        else:
+            def result(traj):
+                traj.identifyReversals()
+                s = traj.getMaskedCentroid(traj.s)
+                s[traj.nearRev] = ma.masked
+                return s.var()*acf(s, lags)
+
+            C = np.array([result(traj)
+                          for traj in self.asWindows(windowSize)]).T
+            C = C.mean(axis=1)
+        tau = lags / self.frameRate
+
         return tau, C
 
-    def plotSpeedAutocorrelation(self, maxT=100, color='k', showPlot=True):
-        tau, C = self.getSpeedAutocorrelation(maxT)
+    def plotSpeedAutocorrelation(self, maxT=10., windowSize=100.,
+                                 color='k', showPlot=True):
+        tau, C = self.getSpeedAutocorrelation(maxT, windowSize)
         plt.plot(tau, C, '-', color=color)
-        plt.xlabel(r'$\tau (s)$')
-        plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.xlabel(r'$\tau$ (s)')
+        plt.ylabel(r'$\langle \hat{s}(0) \cdot \hat{s}(\tau)\rangle \mathrm{(um/s)}^2$')
         if showPlot:
             plt.show()
 
