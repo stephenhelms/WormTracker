@@ -10,7 +10,7 @@ import wormtracker.postprocess as wtp
 from wormtracker import Logger 
 # wormtracker.parallel
 
-hdf5path = 'C:\\hdf5\\'
+hdf5path = ''
 
 
 def batchProcessVideos(wormVideos):

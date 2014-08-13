@@ -15,7 +15,7 @@ import multiprocessing
 
 # NOTE: Matlab crop indices are flipped (y,x,h,w) relative to Numpy arrays
 
-libavPath = 'C:\\libav\\bin\\'
+libavPath = ''
 
 class Logger: 
     @staticmethod
