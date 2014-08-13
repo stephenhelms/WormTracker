@@ -6,6 +6,7 @@ import multiprocessing
 import time
 import h5py
 import wormtracker as wt
+import wormtracker.postprocess as wtp
 from wormtracker import Logger 
 # wormtracker.parallel
 
@@ -150,7 +151,7 @@ def parallelPostProcessRegions(storeFile):
                     Logger.logPrint(check_output(cmd))
 
                     # then copy worm data over
-                    wormObj = '/worms/{1}/{2}'.format(strain, worm)
+                    wormObj = '/worms/{0}/{1}'.format(strain, worm)
                     cmd = [hdf5path + 'h5copy', '-i', storeFile, '-o',
                            wormFile, '-s', wormObj, '-d', wormObj, '-p']
                     Logger.logPrint('Executing:'+' '.join(cmd))
