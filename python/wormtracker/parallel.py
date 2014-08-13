@@ -4,6 +4,7 @@ import os
 import cPickle
 import multiprocessing
 import time
+import h5py
 import wormtracker as wt
 from wormtracker import Logger 
 # wormtracker.parallel
@@ -36,7 +37,7 @@ def parallelProcessRegions(wormVideo):
     pool.close()
     pool.join()
     Logger.logPrint('Finished analyzing all regions')
-    cleanUpPostProcess(wormVideo)
+    cleanUpProcess(wormVideo)
 
 
 def processRegion(region):
@@ -63,7 +64,7 @@ def processRegion(region):
         return 'Failed'
 
 
-def cleanUpPostProcess(wormVideo):
+def cleanUpProcess(wormVideo):
     # merge results into original output file
     # should work
     path, name = os.path.split(wormVideo.storeFile)
@@ -111,6 +112,96 @@ def cleanUpPostProcess(wormVideo):
     except(Exception) as e:
         Logger.logPrint('Error cleaning up:')
         Logger.logPrint('Exception:'+str(e))
+
+
+def parallelPostProcessRegions(storeFile):
+    path, name = os.path.split(storeFile)
+    outputFile = os.path.join(path, 'merge_' + name)
+
+    try:
+        # copy video info
+        Logger.logPrint('Splitting HDF5 output files...')
+        obj = '/video'
+
+        # Linux: create command, do no escape argument values and keep arguments as separated argument list: 
+
+        # have to copy because the merge will fail if there are any duplicates
+        cmd = [hdf5path + 'h5copy', '-i', os.path.join(path, name), '-o',
+             outputFile, '-s', obj, '-d', obj, '-p']
+        
+        Logger.logPrint('Executing:'+' '.join(cmd))
+        Logger.logPrint(check_output(cmd))
+
+        postProcessList = []
+
+        # split worms into separate files to avoid IO issues
+        with h5py.File(storeFile, 'r') as f:
+            strains = f['worms'].keys()
+            for strain in strains:
+                worms = f['worms'][strain].keys()
+                for worm in worms:
+                    # split each worm into a separate hdf5 store
+                    wormFileName = '{1}_{2}_{0}'.format(name, strain, worm)
+                    wormFile = os.path.join(path, wormFileName)
+                    # first copy video info over
+                    cmd = [hdf5path + 'h5copy', '-i', storeFile, '-o',
+                           wormFile, '-s', obj, '-d', obj, '-p']
+                    Logger.logPrint('Executing:'+' '.join(cmd))
+                    Logger.logPrint(check_output(cmd))
+
+                    # then copy worm data over
+                    wormObj = '/worms/{1}/{2}'.format(strain, worm)
+                    cmd = [hdf5path + 'h5copy', '-i', storeFile, '-o',
+                           wormFile, '-s', wormObj, '-d', wormObj, '-p']
+                    Logger.logPrint('Executing:'+' '.join(cmd))
+                    Logger.logPrint(check_output(cmd))
+
+                    # add worm to list to postprocess
+                    postProcessList.append((wormFile, strain, worm))
+
+        # parallel postprocess each region
+        pool = multiprocessing.Pool()
+        result = pool.map_async(postProcessRegion, postProcessList)
+        Logger.logPrint(','.join([str(r) for r in result.get()]))
+        pool.close()
+        pool.join()
+        Logger.logPrint('Finished analyzing all regions')
+
+        # merge files back together
+        for (wormFile, strain, worm) in postProcessList:
+            try:
+                args = [hdf5path + 'h5copy', '-i', wormFile,
+                              '-o', outputFile, '-s',
+                              '/worms/{0}/{1}','-d', '/worms/{0}/{1}',
+                              '-p']
+                #update 
+                cmd=[arg.format(strain,worm) for arg in args] 
+
+                Logger.logPrint('Executing:'+' '.join(cmd))
+                Logger.logPrint('Output:'+check_output(cmd, stderr=STDOUT))
+                
+                # remove premerge file
+                os.remove(wormFile)
+            except(Exception) as e:
+                Logger.logPrint('Error cleaning up:')
+                Logger.logPrint('Exception:'+str(e))
+
+        # remove original file
+        os.remove(storeFile)
+
+        # rename merge file
+        os.rename(outputFile, storeFile)
+    except(Exception) as e:
+        Logger.logPrint('Error cleaning up:')
+        Logger.logPrint('Exception:'+str(e))
+
+
+def postProcessRegion(jobInfo):
+    wormFile, strain, worm = jobInfo
+    with h5py.File(wormFile, 'r+') as f:
+        pp = wtp.WormTrajectoryPostProcessor(f, strain, worm)
+        pp.postProcess()
+        pp.store()
 
 
 if __name__ == '__main__':
