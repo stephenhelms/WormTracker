@@ -91,3 +91,8 @@ def loadWormVideos(f):
         video.getNumberOfFrames()
         videos.append(video)
     return videos
+
+
+def extractStoreFileList(f):
+    config = yaml.load(f)
+    return [video['videoSettings']['storeFile'] for video in config['videos']]
