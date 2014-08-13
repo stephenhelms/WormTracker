@@ -448,9 +448,13 @@ class WormTrajectory:
 
         return (tau, Sigma)
 
-    def plotMeanSquaredDisplacement(self, tau=None, showPlot=True):
+    def plotMeanSquaredDisplacement(self, tau=None, Dworm=100., showPlot=True):
         tau, Sigma = self.getMeanSquaredDisplacement(tau)
         plt.plot(np.log10(tau), Sigma, 'k.')
+        s = self.getMaskedCentroid(self.s)
+        plt.plot(np.log10(tau), np.log10((s.mean()**2)*(tau**2)), 'r-')
+        alpha = 4.*Dworm
+        plt.plot(np.log10(tau), np.log10(alpha*tau), 'r:')
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
         if showPlot:
