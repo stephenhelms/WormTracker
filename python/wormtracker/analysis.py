@@ -59,8 +59,8 @@ class WormTrajectory:
         self.Ctheta = self.h5ref['Ctheta']
         self.ltheta = self.h5ref['ltheta']
         self.vtheta = self.h5ref['vtheta']
-        self.length = self.h5ref['avgLength']
-        self.width = self.h5ref['avgWidth']
+        self.length = self.h5ref['avgLength'][0]
+        self.width = self.h5ref['avgWidth'][0]
         self.badFrames = self.h5ref['badFrames'][...]
         self.allCentroidMissing = np.all(self.badFrames)
 
