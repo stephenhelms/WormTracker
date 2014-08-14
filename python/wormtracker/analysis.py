@@ -510,6 +510,34 @@ class WormTrajectory:
         if showPlot:
             plt.show()
 
+    def plotPosturalPhaseSpaceDensity(self, postureVec1, postureVec2,
+                                      showPlot=True):
+        if self.Ctheta is None:
+            return
+        if isinstance(postureVec1, int):
+            postureVec1 = self.vtheta[:, postureVec1]
+        if isinstance(postureVec2, int):
+            postureVec2 = self.vtheta[:, postureVec2]
+        posture = self.getMaskedPosture(self.posture)
+        missing = np.any(posture.mask, axis=1)
+        A = np.dot(posture, postureVec1)
+        A[missing] = ma.masked
+        B = np.dot(posture, postureVec2)
+        B[missing] = ma.masked
+        xmin = A.min()
+        xmax = A.max()
+        ymin = B.min()
+        ymax = B.max()
+        X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        values = np.vstack([A.compressed(), B.compressed()])
+        kernel = stats.gaussian_kde(values)
+        Z = np.reshape(kernel(positions).T, X.shape)
+        plt.imshow(np.rot90(Z), extent=[xmin,xmax,ymin,ymax])
+        plt.show()
+        if showPlot:
+            plt.show()
+
     def plotPosturalPhaseSpace(self, postureVec1, postureVec2, color='k',
                                showPlot=True):
         if self.Ctheta is None:
