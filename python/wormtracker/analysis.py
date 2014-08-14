@@ -811,10 +811,10 @@ class WormTrajectoryEnsemble:
         n = int(np.round(maxT*self[0].frameRate))
         tau = range(n)/self[0].frameRate
         C, Cl, Cu = self.ensembleAverage(lambda x: x.getBearingAutocorrelation(maxT)[1])
-        plt.semilogx(tau, C, '.-', color=color, label=self.name)
+        plt.plot(tau, C, '.-', color=color, label=self.name)
         plt.fill_between(tau, Cl, Cu, facecolor=color, alpha=0.3)
-        plt.xlabel(r'$\log \tau / (s)$')
-        plt.ylabel(r'$\langle s(t) \cdot s(t+\tau)\rangle$')
+        plt.xlabel(r'$\tau / (s)$')
+        plt.ylabel(r'$\langle \vec{\psi}(0) \cdot \vec{\psi}(\tau)\rangle$')
         plt.grid(True)
         # TODO: smart xlim
         if showPlot:
