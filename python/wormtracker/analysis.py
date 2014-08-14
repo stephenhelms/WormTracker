@@ -5,6 +5,7 @@ from numpy import linalg as LA
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
 import h5py
 import itertools
 import collections
@@ -221,6 +222,18 @@ class WormTrajectory:
         # length
         # width
         return ip
+
+    def calculatePosturalMeasurements(self):
+        posture = self.getMaskedPosture(self.posture)
+        missing = np.any(posture.mask, axis=1)
+        if np.all(missing):
+            self.Ctheta = None
+            self.ltheta = None
+            self.vtheta = None
+        else:
+            posture = posture[~missing, :].T
+            self.Ctheta = np.cov(posture)
+            self.ltheta, self.vtheta = LA.eig(self.Ctheta)
 
     def getMaskedCentroid(self, data):
         data = ma.array(data)
@@ -476,7 +489,7 @@ class WormTrajectory:
         plt.plot(np.cumsum(self.ltheta)/np.sum(self.ltheta), '.-', color=color,
                  label='{0} {1}'.format(self.strain, self.wormID))
         plt.xlabel('Postural Mode')
-        plt.ylabel('%% Variance')
+        plt.ylabel(r'% Variance')
         plt.ylim((0, 1))
         if showPlot:
             plt.show()
@@ -492,6 +505,8 @@ class WormTrajectory:
         A[missing] = ma.masked
         plt.plot(self.t, A, '.', color=color,
                  label='{0} {1}'.format(self.strain, self.wormID))
+        plt.xlabel('Time (s)')
+        plt.ylabel('Projection')
         if showPlot:
             plt.show()
 
@@ -510,6 +525,42 @@ class WormTrajectory:
         B = np.dot(posture, postureVec2)
         B[missing] = ma.masked
         plt.scatter(A, B, marker='.', c=color, s=5)
+        if showPlot:
+            plt.show()
+
+    def plotPosturalPhaseSpace3D(self, postureVec1, postureVec2, postureVec3,
+                                 nMaxPts=1000, color='k', showPlot=True):
+        if self.Ctheta is None:
+            return
+        if isinstance(postureVec1, int):
+            postureVec1 = self.vtheta[:, postureVec1]
+        if isinstance(postureVec2, int):
+            postureVec2 = self.vtheta[:, postureVec2]
+        if isinstance(postureVec3, int):
+            postureVec3 = self.vtheta[:, postureVec3]
+        posture = self.getMaskedPosture(self.posture)
+        missing = np.any(posture.mask, axis=1)
+        A = np.dot(posture, postureVec1)
+        A[missing] = ma.masked
+        B = np.dot(posture, postureVec2)
+        B[missing] = ma.masked
+        C = np.dot(posture, postureVec3)
+        C[missing] = ma.masked
+        A = A.compressed()
+        B = B.compressed()
+        C = C.compressed()
+        if A.shape[0] > nMaxPts:
+            plotPts = np.random.choice(A.shape[0], nMaxPts, replace=False)
+            A = A[plotPts]
+            B = B[plotPts]
+            C = C[plotPts]
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(A,B,C,
+                   marker='o', c='k', s=5)
+        ax.set_xlabel('Mode 1')
+        ax.set_ylabel('Mode 2')
+        ax.set_zlabel('Mode 3')
         if showPlot:
             plt.show()
 
