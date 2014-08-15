@@ -430,7 +430,7 @@ class WormVideoRegion:
             if self.foodCircle is not None:
                 g['foodCircle'][...] = self.foodCircle
             else:
-                g['foodCircle'][...] = np.ones((3,))*np.nan
+                g['foodCircle'][...] = (np.nan, np.nan, np.nan)
 
             # create worm observation datasets
             n = self.nFrames
