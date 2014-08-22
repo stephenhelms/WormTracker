@@ -118,10 +118,11 @@ ens.plotPosturalPhaseSpaceDensity(0,1)
 # divide the data into two ensembles
 ens1 = ens[:3]
 ens1.name = '0-2'
+ens1.color = 'b'
 ens2 = ens[3:]
 ens2.name = '3-5'
-colorDict = {ens1.name: 'k', ens2.name: 'r'}
-group = wta.WormTrajectoryEnsembleGroup([ens1, ens2], colorScheme=lambda e: colorDict[e.name])
+ens2.color = 'r'
+group = wta.WormTrajectoryEnsembleGroup([ens1, ens2])
 
 # plot mean squared displacement
 group.plotMeanSquaredDisplacement()

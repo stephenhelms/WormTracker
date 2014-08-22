@@ -1,0 +1,34 @@
+ensembles:
+- color: b
+  name: 0-2
+  trajectories:
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '1'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '4'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '5'}
+- color: r
+  name: 3-5
+  trajectories:
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '6'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '8'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '9'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '10'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '11'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '12'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '13'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '14'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '15'}
+  - {storeFile: !!python/unicode '/Users/stephenhelms/Dropbox/OpenData/short_test.h5',
+    strain: N2, wormID: !!python/unicode '16'}
+name: null

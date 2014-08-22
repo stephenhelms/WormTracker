@@ -4,6 +4,7 @@ import yaml
 import wormtracker as wt
 import wormtracker.parallel as wtp
 import wormtracker.postprocess as wtpp
+import wormtracker.analysis as wta
 
 def saveWormVideo(video, f):
     systemSettings = getSystemConfigDict()
@@ -96,3 +97,80 @@ def loadWormVideos(f):
 def extractStoreFileList(f):
     config = yaml.load(f)
     return [video['videoSettings']['storeFile'] for video in config['videos']]
+
+
+# functions for saving/loading trajectories and ensembles from yaml files/dictionaries
+def loadTrajectory(dataSource):
+    if type(dataSource) is str:
+        with open(dataSource, 'r') as f:
+            dataSource = yaml.load(f)
+    f = h5py.File(dataSource['storeFile'], 'r')
+    if 'videoFilePath' in dataSource:
+        videoFilePath = dataSource['videoFilePath']
+    else:
+        videoFilePath = None
+    if 'frameRange' in dataSource:
+        frameRange = dataSource['frameRange']
+    else:
+        frameRange = None
+    traj = wta.WormTrajectory(f, dataSource['strain'], dataSource['wormID'],
+                              videoFilePath, frameRange)
+    return traj
+
+
+def saveTrajectory(traj, output=None):
+    data = {'storeFile': traj.h5obj.filename,
+            'strain': traj.strain,
+            'wormID': traj.wormID}
+    if traj.videoFile is not None:
+        videoFilePath, videoFileName = os.path.split(traj.videoFile)
+        data['videoFilePath'] = videoFilePath
+    if traj.frameRange is not None:
+        data['frameRange'] = traj.frameRange
+    if output is not None:
+        yaml.dump(data, output)
+    return data
+
+
+def loadEnsemble(dataSource):
+    if type(dataSource) is str:
+        with open(dataSource, 'r') as f:
+            dataSource = yaml.load(f)
+    trajList = [loadTrajectory(trajEntry)
+                for trajEntry in dataSource['trajectories']]
+    if 'name' in dataSource:
+        name = dataSource['name']
+    else:
+        name = None
+    return wta.WormTrajectoryEnsemble(trajList, name)
+
+
+def saveEnsemble(ens, output=None):
+    data = {'trajectories': [saveTrajectory(traj) for traj in ens],
+            'color': ens.color}
+    if ens.name is not None:
+        data['name'] = ens.name
+    if output is not None:
+        yaml.dump(data, output)
+    return data
+
+
+def loadEnsembleGroup(dataSource):
+    if type(dataSource) is str:
+        with open(dataSource, 'r') as f:
+            dataSource = yaml.load(f)
+    ensList = [loadEnsemble(ensEntry)
+               for ensEntry in dataSource['ensembles']]
+    if 'name' in dataSource:
+        name = dataSource['name']
+    else:
+        name = None
+    return wta.WormTrajectoryEnsembleGroup(ensList, name)
+
+
+def saveEnsembleGroup(group, output=None):
+    data = {'name': group.name,
+            'ensembles': [saveEnsemble(ens) for ens in group]}
+    if output is not None:
+        yaml.dump(data, output)
+    return data
