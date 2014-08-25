@@ -48,4 +48,4 @@ echo "POST: Contents of output dir:"
 ls -l out/
 
 mkdir -p ~/worms/out/
-cp -vrf out/ ~/worms/out/${videoName}
+cp -vrf ${videoName}.h5 ~/worms/out/${videoName}.h5
