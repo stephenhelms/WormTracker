@@ -38,6 +38,26 @@ def pairwise(iterable):
     return itertools.izip(a, b)
 
 
+def meanSquaredDisplacement(X, lags=500, exclude=None):
+    if exclude is None:
+        exclude = np.zeros(X.shape[0])
+    exclude = np.cumsum(exclude.astype(int))
+
+    if type(lags) is int:
+        lags = xrange(1,lags)
+
+    Sigma = ma.zeros((len(lags),))
+    for i, lag in enumerate(lags):
+        x0 = X[lag:, :].copy()
+        x1 = X[:-lag, :].copy()
+        reject = (exclude[lag:]-exclude[:-lag])>0
+        x0[reject, :] = ma.masked
+        x1[reject, :] = ma.masked
+        displacements = x0 - x1
+        Sigma[i] = np.mean(np.log10((displacements**2).sum(axis=1).compressed()))
+    return Sigma
+
+
 class WormTrajectory:
     def __init__(self, h5obj, strain, wormID, videoFilePath=None, frameRange=None):
         self.firstFrame = None
@@ -451,24 +471,23 @@ class WormTrajectory:
 
     def getMeanSquaredDisplacement(self, tau=None):
         if tau is None:
-            tau = np.logspace(-1, 3, 200)
+            tau = np.logspace(-1, 2, 200)
 
         lags = np.round(tau*self.frameRate)
-        Sigma = ma.zeros((200,))
         X = self.getMaskedCentroid(self.X)
-        for i, lag in enumerate(lags):
-            displacements = X[lag:, :] - X[:-lag, :]
-            Sigma[i] = np.mean(np.log10(np.sum(displacements**2, axis=1)))
+        Sigma = meanSquaredDisplacement(X, lags, self.excluded)
 
         return (tau, Sigma)
 
-    def plotMeanSquaredDisplacement(self, tau=None, Dworm=100., showPlot=True):
+    def plotMeanSquaredDisplacement(self, tau=None, Dworm=100., showPlot=True,
+                                    showRef=True):
         tau, Sigma = self.getMeanSquaredDisplacement(tau)
         plt.plot(np.log10(tau), Sigma, 'k.')
-        s = self.getMaskedCentroid(self.s)
-        plt.plot(np.log10(tau), np.log10((s.mean()**2)*(tau**2)), 'r-')
-        alpha = 4.*Dworm
-        plt.plot(np.log10(tau), np.log10(alpha*tau), 'r:')
+        if showRef:
+            s = self.getMaskedCentroid(self.s)
+            plt.plot(np.log10(tau), np.log10((s.mean()**2)*(tau**2)), 'r-')
+            alpha = 4.*Dworm
+            plt.plot(np.log10(tau), np.log10(alpha*tau), 'r:')
         plt.xlabel(r'log $\tau$ \ (s)')
         plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
         if showPlot:
