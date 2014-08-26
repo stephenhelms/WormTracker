@@ -427,7 +427,10 @@ class WormVideoRegion:
 
             # write configuration
             g['cropRegion'][...] = self.cropRegion
-            g['foodCircle'][...] = self.foodCircle
+            if self.foodCircle is not None:
+                g['foodCircle'][...] = self.foodCircle
+            else:
+                g['foodCircle'][...] = (np.nan, np.nan, np.nan)
 
             # create worm observation datasets
             n = self.nFrames

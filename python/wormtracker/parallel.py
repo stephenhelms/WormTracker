@@ -27,7 +27,7 @@ def batchProcessVideos(wormVideos):
     pool.join()
     Logger.logPrint('Finished analyzing all regions')
     for video in wormVideos:
-        cleanUpPostProcess(video)
+        cleanUpProcess(video)
 
 
 def parallelProcessRegions(wormVideo):

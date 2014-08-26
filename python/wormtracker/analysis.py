@@ -594,7 +594,7 @@ class WormTrajectory:
 
 
 class WormTrajectoryEnsemble:
-    def __init__(self, trajectoryIter=None, name=None, nameFunc=None):
+    def __init__(self, trajectoryIter=None, name=None, nameFunc=None, color='k'):
         if any(not isinstance(it, WormTrajectory) for it in trajectoryIter):
             raise TypeError('A trajectory ensemble must contain ' +
                             'WormTrajectory objects.')
@@ -603,6 +603,7 @@ class WormTrajectoryEnsemble:
         if nameFunc is None:
             nameFunc = lambda t: t.strain + ' ' + t.wormID
         self.nameFunc = nameFunc
+        self.color = color
 
     def __iter__(self):
         for traj in self._trajectories:
@@ -761,9 +762,11 @@ class WormTrajectoryEnsemble:
         func = lambda t: np.array([ma.mean(t.getMaskedCentroid(t.s))])
         return self.ensembleAverage(func)
 
-    def plotSpeedDistribution(self, bins=None, color='k', showPlot=True):
+    def plotSpeedDistribution(self, bins=None, color=None, showPlot=True):
         if bins is None:
             bins = np.linspace(0, 500, 200)
+        if color is None:
+            color = self.color
         p, pl, pu = self.ensembleAverage(lambda x: x.getSpeedDistribution(bins))
         plt.plot(bins, p, '.-', color=color, label=self.name)
         plt.hold(True)
@@ -792,7 +795,9 @@ class WormTrajectoryEnsemble:
         if showPlot:
             plt.show()
 
-    def plotSpeedAutocorrelation(self, maxT=100, color='k', showPlot=True):
+    def plotSpeedAutocorrelation(self, maxT=100, color=None, showPlot=True):
+        if color is None:
+            color = self.color
         # assume all same frame rate
         n = int(np.round(maxT*self[0].frameRate))
         tau = range(n)/self[0].frameRate
@@ -806,7 +811,9 @@ class WormTrajectoryEnsemble:
         if showPlot:
             plt.show()
 
-    def plotBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):
+    def plotBearingAutocorrelation(self, maxT=100, color=None, showPlot=True):
+        if color is None:
+            color = self.color
         # assume all same frame rate
         n = int(np.round(maxT*self[0].frameRate))
         tau = range(n)/self[0].frameRate
@@ -820,7 +827,9 @@ class WormTrajectoryEnsemble:
         if showPlot:
             plt.show()
 
-    def plotMeanSquaredDisplacement(self, tau=None, color='k', showPlot=True):
+    def plotMeanSquaredDisplacement(self, tau=None, color=None, showPlot=True):
+        if color is None:
+            color = self.color
         tau = np.logspace(-1,3,200)
         S, Sl, Su = self.ensembleAverage(lambda x: x.getMeanSquaredDisplacement(tau)[1])
         log_tau = np.log10(tau)
@@ -843,9 +852,11 @@ class WormTrajectoryEnsemble:
         if showPlot:
             plt.show()
 
-    def plotPosturalModeDistribution(self, color='k', showPlot=True):
+    def plotPosturalModeDistribution(self, color=None, showPlot=True):
         if self.Ctheta is None:
             return
+        if color is None:
+            color = self.color
         plt.plot(np.cumsum(self.ltheta)/np.sum(self.ltheta), '.-', color=color)
         plt.xlabel('Postural Mode')
         plt.ylabel('%% Variance')
@@ -853,7 +864,9 @@ class WormTrajectoryEnsemble:
         if showPlot:
             plt.show()
 
-    def plotAveragePosturalModeDistribution(self, color='k', showPlot=True):
+    def plotAveragePosturalModeDistribution(self, color=None, showPlot=True):
+        if color is None:
+            color = self.color
         l, ll, lu = self.ensembleAverage(lambda x: np.cumsum(x.ltheta) / np.sum(x.ltheta))
         plt.plot(l, '.-', color=color)
         plt.hold(True)
@@ -892,18 +905,14 @@ class WormTrajectoryEnsemble:
 
 
 class WormTrajectoryEnsembleGroup(object):
-    def __init__(self, ensembles, name=None, colorScheme=None):
+    def __init__(self, ensembles, name=None):
         if any(not isinstance(it, WormTrajectoryEnsemble)
                for it in ensembles):
             raise TypeError('A trajectory ensemble group must contain ' +
                             'WormTrajectoryEnsemble objects.')
         self._ensembles = list(ensembles)
         self.name = name
-        if colorScheme is None:
-            self.colorScheme = lambda e: 'k'
-        else:
-            self.colorScheme = colorScheme
-
+        
     def __iter__(self):
         for ens in self._ensembles:
             yield ens
@@ -992,9 +1001,7 @@ class WormTrajectoryEnsembleGroup(object):
 
     def plotSpeedAutocorrelation(self, showPlot=True):
         for ens in self:
-            color = self.colorScheme(ens)
-            ens.plotSpeedAutocorrelation(color=color,
-                                         showPlot=False)
+            ens.plotSpeedAutocorrelation(showPlot=False)
         plt.legend()
         if showPlot:
             plt.show()
@@ -1003,18 +1010,14 @@ class WormTrajectoryEnsembleGroup(object):
         if tau is None:
             tau = np.logspace(-1,3,80)
         for ens in self:
-            color = self.colorScheme(ens)
-            ens.plotMeanSquaredDisplacement(color=color,
-                                            showPlot=False)
+            ens.plotMeanSquaredDisplacement(showPlot=False)
         plt.legend()
         if showPlot:
             plt.show()
 
     def plotPosturalModeDistribution(self, showPlot=True):
         for ens in self:
-            color = self.colorScheme(ens)
-            ens.plotAveragePosturalModeDistribution(color=color,
-                                                    showPlot=False)
+            ens.plotAveragePosturalModeDistribution(showPlot=False)
         plt.legend()
         if showPlot:
             plt.show()
