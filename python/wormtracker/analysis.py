@@ -78,6 +78,7 @@ class WormTrajectory:
 
         self.revBoundaries = None
         self.nearRev = np.zeros(self.t.shape, 'bool')
+        self.excluded = np.zeros(self.t.shape, 'bool')
         self.state = None
 
         if frameRange is not None:
@@ -237,7 +238,7 @@ class WormTrajectory:
 
     def getMaskedCentroid(self, data):
         data = ma.array(data)
-        sel = self.badFrames
+        sel = self.badFrames | self.excluded
         data[sel, ...] = ma.masked
         data[np.isnan(data)] = ma.masked
         return data
@@ -245,7 +246,7 @@ class WormTrajectory:
     def getMaskedPosture(self, data):
         data = ma.array(data)
         sel = np.logical_or(np.logical_not(self.orientationFixed),
-                            self.badFrames)
+                            self.badFrames) | self.excluded
         data[sel, ...] = ma.masked
         data[np.isnan(data)] = ma.masked
         return data
