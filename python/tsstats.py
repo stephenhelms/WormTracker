@@ -9,7 +9,11 @@ import collections
 from scipy import stats
 
 
-def acf(x, lags=500):
+def acf(x, lags=500, exclude=None):
+    if exclude is None:
+        exclude = np.zeros(x.shape)
+    exclude = np.cumsum(exclude.astype(int))
+
     # from stackexchange
     x = x - x.mean()  # remove mean
     if type(lags) is int:
@@ -20,20 +24,20 @@ def acf(x, lags=500):
         if l == 0:
             C[i] = 1
         else:
-            C[i] = ma.corrcoef(x[:-l], x[l:])[0, 1]
+            x0 = x[:-l].copy()
+            x1 = x[l:].copy()
+            reject = (exclude[l:]-exclude[:-l])>0
+            x0[reject] = ma.masked
+            x1[reject] = ma.masked
+            C[i] = ma.corrcoef(x0, x1)[0, 1]
     return C
 
 
-def circacf(x, lags=500):
-    if type(lags) is int:
-        lags = xrange(1, lags)
+def dotacf(x, lags=500, exclude=None):
+    if exclude is None:
+        exclude = np.zeros(x.shape)
+    exclude = np.cumsum(exclude.astype(int))
 
-    return np.array([1] +
-                    [np.mean(np.cos(x[lag:]-x[:-lag]))
-                     for lag in lags])
-
-
-def dotacf(x, lags=500):
     if type(lags) is int:
         lags = xrange(lags)
     C = ma.zeros((len(lags),))
@@ -41,11 +45,20 @@ def dotacf(x, lags=500):
         if l == 0:
             C[i] = (x*x).sum(axis=1).mean()
         else:
-            C[i] = (x[l:, :]*x[:-l, :]).sum(axis=1).mean()
+            x0 = x[:-l, :].copy()
+            x1 = x[l:, :].copy()
+            reject = (exclude[l:]-exclude[:-l])>0
+            x0[reject, :] = ma.masked
+            x1[reject, :] = ma.masked
+            C[i] = (x0*x1).sum(axis=1).mean()
     return C
 
 
-def drift(x, lags=500):
+def drift(x, lags=500, exclude=None):
+    if exclude is None:
+        exclude = np.zeros(x.shape)
+    exclude = np.cumsum(exclude.astype(int))
+
     if type(lags) is int:
         lags = xrange(lags)
     mu = ma.zeros((len(lags),))
@@ -53,7 +66,12 @@ def drift(x, lags=500):
         if lag==0:
             mu[i] = 0
         else:
-            displacements = x[lag:] - x[:-lag]
+            x0 = x[lag:].copy()
+            x1 = x[:-lag].copy()
+            reject = (exclude[lag:]-exclude[:-lag])>0
+            x0[reject] = ma.masked
+            x1[reject] = ma.masked
+            displacements = x0 - x1
             mu[i] = displacements.mean()
     return mu
 
