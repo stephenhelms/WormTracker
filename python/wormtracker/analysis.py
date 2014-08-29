@@ -152,6 +152,7 @@ class WormTrajectory:
         self.posture = self.posture[frameRange[0]:frameRange[1], :]
         self.orientationFixed = self.orientationFixed[frameRange[0]:frameRange[1]]
         self.allPostureMissing = np.all(np.logical_not(self.orientationFixed))
+        self.excluded = self.excluded[frameRange[0]:frameRange[1]]
 
         self.clearAnalysisVariables()
 
