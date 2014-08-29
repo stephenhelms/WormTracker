@@ -54,7 +54,10 @@ def meanSquaredDisplacement(X, lags=500, exclude=None):
         x0[reject, :] = ma.masked
         x1[reject, :] = ma.masked
         displacements = x0 - x1
-        Sigma[i] = np.mean(np.log10((displacements**2).sum(axis=1).compressed()))
+        d2 = (displacements**2).sum(axis=1).compressed()
+        ld2 = np.log10(d2)
+        ld2[np.isinf(ld2)] = ma.masked
+        Sigma[i] = np.mean(ld2)
     return Sigma
 
 
