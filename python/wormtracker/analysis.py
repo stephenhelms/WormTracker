@@ -1015,9 +1015,7 @@ class WormTrajectoryEnsembleGroup(object):
 
     def plotSpeedDistribution(self, bins=None, showPlot=True):
         for ens in self:
-            color = self.colorScheme(ens)
             ens.plotSpeedDistribution(bins=bins,
-                                      color=color,
                                       showPlot=False)
         plt.legend()
         if showPlot:
