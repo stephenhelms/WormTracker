@@ -2,14 +2,16 @@ import os
 import numpy as np
 import numpy.ma as ma
 from numpy import linalg as LA
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import h5py
 import itertools
 import collections
 from abc import ABCMeta, abstractmethod
 import scipy.optimize as opt
+import scipy.integrate as scint
 from tsstats import *
+import sde
+import stochprocess
 
 
 class TrajectoryModel(object):
@@ -28,18 +30,23 @@ class TrajectoryModel(object):
         pass
 
     def simulate(self, storeFile, location, nTimes=10):
+        self._prepareSimulation(storeFile, h5loc, nTimes)
         print 'Running simulations...'
         for i in xrange(nTimes):
             print '{0} of {1}'.format(i, nTimes)
-            location = location + '/' + str(i)
-            self._doSimulation(storeFile, location)
+            location = location
+            self._doSimulation(storeFile, location, i)
 
     @abstractmethod
-    def _doSimulation(self, storeFile, h5loc):
+    def _prepareSimulation(self, storeFile, h5loc, nTimes):
         pass
 
     @abstractmethod
-    def visualize(self, trajectory):
+    def _doSimulation(self, storeFile, h5loc, i):
+        pass
+
+    @abstractmethod
+    def visualize(self, trajectory, storeFile, location):
         pass
 
     def __str__(self):
@@ -62,6 +69,10 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.mu_s = None
         self.tau_s = None
         self.D_s = None
+
+        # simulation settings
+        self.duration = 30.*60.
+        self.dt = 1./11.5
 
     def fit(self, trajectory, windowSize=None, plotFit=False):
         self.fitReversals(trajectory, windowSize, plotFit)
@@ -223,8 +234,204 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.tau_s = vector[5]
         self.D_s = vector[6]
 
-    def _doSimulation(self, storeFile, location):
-        raise NotImplemented()
+    def _prepareSimulation(self, storeFile, location, nTimes):
+        with h5py.File(storeFile) as f:
+            if location not in f:
+                f.create_group(location)
+            g = f[location]
 
-    def visualize(self, trajectory):
-        raise NotImplemented()
+            n = self.duration/self.dt
+            if 's' not in g:
+                g.create_dataset('s', (nTimes, n), dtype='float64')
+            if 'psi' not in g:
+                g.create_dataset('psi', (nTimes, n), dtype='float64')
+            if 'phi' not in g:
+                g.create_dataset('phi', (nTimes, n), dtype='float64')
+            if 'dpsi' not in g:
+                g.create_dataset('dpsi', (nTimes, n), dtype='float64')
+            if 'v' not in g:
+                g.create_dataset('v', (nTimes, n, 2), dtype='float64')
+            if 'X' not in g:
+                g.create_dataset('X', (nTimes, n, 2), dtype='float64')
+            if 't' not in g:
+                g.create_dataset('t', (n,), dtype='float64')
+
+            t = np.arange(0, n)*self.dt
+            g['t'][...] = t
+
+    def _doSimulation(self, storeFile, location, i):
+        with h5py.File(storeFile) as f:
+            g = f[location]
+
+            s = self._simulateSpeed()
+            g['s'][i, :] = s
+            psi = self._simulateBodyBearing()
+            g['psi'][i, :] = psi
+            r = self._simulateReversals()
+            dpsi = np.zeros((n,))
+            dpsi[r == 1] = np.pi
+            g['dpsi'][i, :] = dpsi
+            phi = psi + dpsi
+            g['phi'][i, :] = phi
+
+            v = s*np.array([np.cos(phi), np.sin(phi)])
+            g['v'][i, ...] = v
+            X = scint.cumtrapz(v, dx=self.dt)
+            g['X'][i, ...] = X
+
+    def _simulateSpeed(self):
+        ou = sde.OrnsteinUhlenbeck(self.tau_s, self.mu_s, np.sqrt(2.*self.D_s))
+        return ou.integrateEuler(0., self.duration, self.dt, self.mu_s)[1]
+
+    def _simulateBodyBearing(self):
+        dd = sde.DiffusionDrift(self.k_psi, self.D_psi)
+        return dd.integrateEuler(0, self.duration, self.dt, 0.)[1]
+
+    def _simulateReversals(self):
+        psp = stochprocess.PoissonTwoStateProcess(self.tau_fwd, self.tau_rev)
+        return psp.stateTimeSeries(self.duration, self.dt)
+
+    def visualize(self, trajectory, storeFile, location):
+        # plots: X, msd, vacf, Cdpsi, Cpsi, Cs, mean bearing vs time, speed dist
+        # Xtraj msd  C mean bearing
+        # Xsim  vacf   speed dist
+        # trajectories
+        self.visualizeTrajectory(trajectory, storeFile, location,
+                                 axes=(plt.subplot(4, 2, 0),
+                                       plt.subplot(4, 2, 4)),
+                                 showPlot=False)
+        # mean-squared displacement
+        self.visualizeMeanSquaredDisplacement(trajectory, storeFile,
+                                              location,
+                                              plt.subplot(4, 2, 1),
+                                              showPlot=False)
+        
+        plt.show()
+
+    def visualizeTrajectory(self, trajectory, storeFile, location,
+                            axes=None, showPlot=True):
+        with h5py.File(storeFile, 'r') as f:
+            g = f[location]
+            if axes is None:
+                axes = (plt.subplot(211), plt.subplot(212))
+            dataAx, simAx = axes
+            plt.sca(dataAx)
+            trajectory.plotTrajectory(showPlot=False)
+            plt.title('Observed Trajectory')
+            simAx.plot(g['X'][0, :, 0], g['X'][0, :, 1], 'k-')
+            simAx.xlabel('x (um)')
+            simAx.ylabel('y (um)')
+            simAx.gca().set_aspect('equal')
+            simAx.title('Simulated Trajectory')
+        if showPlot:
+            plt.show()
+
+    def visualizeMeanSquaredDisplacement(self, trajectory, storeFile,
+                                         location, axes=None, showPlot=True):
+        with h5py.File(storeFile, 'r') as f:
+            g = f[location]
+            if axes is not None:
+                plt.sca(axes)
+            tau = np.logspace(-1, 2, 200)
+            tau, Sigma = trajectory.getMeanSquaredDisplacement(tau)
+            plt.plot(np.log10(tau), Sigma, 'k.')
+            lags = np.round(tau/self.dt)
+            Sigma = ma.zeros((g['X'].shape[0], tau.shape[0]))
+            for j, X in enumerate(g['X']):
+                for i, lag in enumerate(lags):
+                    displacements = X[lag:, :] - X[:-lag, :]
+                    Sigma[j, i] = np.mean(np.log10(np.sum(displacements**2,
+                                                          axis=1)))
+            mu, cl, cu = bootstrap(Sigma)
+            plt.plot(np.log10(tau), mu, '.-', color='r')
+            plt.fill_between(log10(tau), cl, cu, facecolor='r', alpha=0.3)
+
+            plt.xlabel(r'log $\tau$ \ (s)')
+            plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+            plt.xlim((np.min(np.log10(tau)), np.max(np.log10(tau))))
+            plt.grid(True)
+        if showPlot:
+            plt.show()
+
+
+class Stephens2014PostureDynamicsModel(TrajectoryModel):
+    def __init__(self):
+        self.vPostures = None
+        self.nPostures = 4
+        self.order = 0
+        self.tau = None
+        self.Toscil = None
+        self.vDynamics = None
+
+    def fit(self, trajectory, windowSize=None, plotFit=False):
+        posture = trajectory.getMaskedPosture(trajectory.posture)
+        dt = 1./trajectory.frameRate
+        vPostures = self.vPostures
+        if vPostures is None:
+            vPostures = trajectory.vtheta[:, :self.nPostures]
+        modes = np.dot(posture, vPostures)
+        modes[posture.mask.any(axis=1), :] = ma.masked
+        # normalize modes to zeros mean (almost true anyway and unit variance)
+        modes = (modes - modes.mean(axis=0))/modes.std(axis=0)
+        # window size not supported yet
+        t = trajectory.t[self.order+1:]
+        y = modes[self.order+1:, :]
+        x = ma.array([modes[i:-1, :] for i in xrange(self.order+1)]).squeeze()
+        if windowSize is None:
+            w, nu, v, Toscil, tau = self._fitWindow(x, y, dt)
+            self.tw = None
+        else:
+            w = []
+            nu = []
+            v = []
+            Toscil = []
+            tau = []
+            tw = []
+            for i in xrange(windowSize/2, t.shape[0]-windowSize/2,
+                            windowSize/10):
+                xw = x[i-windowSize/2:i+windowSize/2]
+                yw = y[i-windowSize/2:i+windowSize/2]
+                if (xw.compressed().shape[0] > windowSize/2 and
+                        yw.compressed().shape[0] > windowSize/2):
+                    tw.append(t[i])
+                    f = self._fitWindow(xw, yw, dt)
+                    w.append(f[0])
+                    nu.append(f[1])
+                    v.append(f[2])
+                    Toscil.append(f[3])
+                    tau.append(f[4])
+            self.tw = tw
+        self.w = w
+        self.nu = nu
+        self.v = v
+        self.Toscil = Toscil
+        self.tau = tau
+
+    def _fitWindow(self, x, y, dt):
+        sel = ~y.mask.any(axis=1) & ~x.mask.any(axis=1)
+        f = LA.lstsq(x[sel, :], y[sel, :])
+        w = f[0]
+        pred = np.dot(x, w)
+        eps = y - pred
+        nu = eps[sel, :].std(axis=0)/np.sqrt(dt)
+        # timescales
+        l, v = LA.eig(w)
+        theta = np.arctan2(np.imag(l), np.real(l))
+        Toscil = 2.*np.pi/(np.abs(theta)/dt)  # in seconds
+        tau = -1.*np.sign(np.real(l))/(np.log(np.abs(l))/dt)  # in seconds
+        return (w, nu, v, Toscil, tau)
+
+    def toParameterVector(self):
+        pass
+
+    def fromParameterVector(self, vector):
+        pass
+
+    def _prepareSimulation(self, storeFile, h5loc, nTimes):
+        pass
+
+    def _doSimulation(self, storeFile, h5loc, i):
+        pass
+
+    def visualize(self, trajectory, storeFile, location):
+        pass
