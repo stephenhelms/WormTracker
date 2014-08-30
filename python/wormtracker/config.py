@@ -142,7 +142,11 @@ def loadEnsemble(dataSource):
         name = dataSource['name']
     else:
         name = None
-    return wta.WormTrajectoryEnsemble(trajList, name)
+    if 'color' in dataSource:
+        color = dataSource['color']
+    else:
+        color = None
+    return wta.WormTrajectoryEnsemble(trajList, name, color=color)
 
 
 def saveEnsemble(ens, output=None):
