@@ -9,6 +9,8 @@ import collections
 from abc import ABCMeta, abstractmethod
 import scipy.optimize as opt
 import scipy.integrate as scint
+import scipy.sparse.linalg as SLA
+import statsmodels.api as sm
 from tsstats import *
 import sde
 import stochprocess
@@ -360,8 +362,11 @@ class Stephens2014PostureDynamicsModel(TrajectoryModel):
         self.nPostures = 4
         self.order = 0
         self.tau = None
-        self.Toscil = None
+        self.foscil = None
         self.vDynamics = None
+        self.lDynamics = None
+        self.damp = None
+        self.robust = False
 
     def fit(self, trajectory, windowSize=None, plotFit=False):
         posture = trajectory.getMaskedPosture(trajectory.posture)
@@ -378,38 +383,48 @@ class Stephens2014PostureDynamicsModel(TrajectoryModel):
         y = modes[self.order+1:, :]
         x = ma.array([modes[i:-1, :] for i in xrange(self.order+1)]).squeeze()
         if windowSize is None:
-            w, nu, v, Toscil, tau = self._fitWindow(x, y, dt)
+            w, nu, v, l, foscil, tau = self._fitWindow(x, y, dt)
             self.tw = None
         else:
             w = []
             nu = []
             v = []
-            Toscil = []
+            l = []
+            foscil = []
             tau = []
             tw = []
             for i in xrange(windowSize/2, t.shape[0]-windowSize/2,
                             windowSize/10):
                 xw = x[i-windowSize/2:i+windowSize/2]
                 yw = y[i-windowSize/2:i+windowSize/2]
-                if (xw.compressed().shape[0] > windowSize/2 and
-                        yw.compressed().shape[0] > windowSize/2):
+                if (xw.compressed().shape[0] > 0.75*windowSize and
+                        yw.compressed().shape[0] > 0.75*windowSize):
                     tw.append(t[i])
                     f = self._fitWindow(xw, yw, dt)
                     w.append(f[0])
                     nu.append(f[1])
                     v.append(f[2])
-                    Toscil.append(f[3])
-                    tau.append(f[4])
+                    l.append(f[3])
+                    foscil.append(f[4])
+                    tau.append(f[5])
             self.tw = tw
         self.w = w
         self.nu = nu
         self.v = v
-        self.Toscil = Toscil
+        self.l = l
+        self.foscil = foscil
         self.tau = tau
 
     def _fitWindow(self, x, y, dt):
         sel = ~y.mask.any(axis=1) & ~x.mask.any(axis=1)
-        f = LA.lstsq(x[sel, :], y[sel, :])
+        if self.damp is None:
+            if ~self.robust:
+                f = LA.lstsq(x[sel, :], y[sel, :])
+            else:
+                resrlm = sm.RLM(y[sel, :], x[sel, :]).fit()
+                w = resrlm.params
+        else:
+            f = SLA.lsmr(y[sel, :], x[sel, :], self.damp)
         w = f[0]
         pred = np.dot(x, w)
         eps = y - pred
@@ -417,9 +432,9 @@ class Stephens2014PostureDynamicsModel(TrajectoryModel):
         # timescales
         l, v = LA.eig(w)
         theta = np.arctan2(np.imag(l), np.real(l))
-        Toscil = 2.*np.pi/(np.abs(theta)/dt)  # in seconds
+        foscil = (np.abs(theta)/dt)/(2.*np.pi)  # in Hz
         tau = -1.*np.sign(np.real(l))/(np.log(np.abs(l))/dt)  # in seconds
-        return (w, nu, v, Toscil, tau)
+        return (w, nu, v, l, foscil, tau)
 
     def toParameterVector(self):
         pass
@@ -435,3 +450,21 @@ class Stephens2014PostureDynamicsModel(TrajectoryModel):
 
     def visualize(self, trajectory, storeFile, location):
         pass
+
+    def plotDynamicsSpace(self):
+        plt.scatter(np.array(self.tau), np.array(self.foscil))
+        plt.xlabel('Damping Time (s)')
+        plt.ylabel('Oscillation Frequency (Hz)')
+        plt.show()
+
+    def plotDynamicsTime(self):
+        ax1 = plt.subplot(211)
+        plt.plot(np.array(self.tw), np.array(self.tau), '.')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Damping Time (s)')
+        plt.subplot(212, sharex=ax1)
+        plt.plot(np.array(self.tw), np.array(self.foscil), '.')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Oscillation Frequency (Hz)')
+        plt.show()
+
