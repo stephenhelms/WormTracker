@@ -157,9 +157,9 @@ class WormTrajectory:
         self.clearAnalysisVariables()
 
     def asWindows(self, windowSize=100., overlap=0.5):
-        nWindows = int(np.round((self.t[-1] - self.t[0]) / windowSize / overlap))
+        nWindows = int(np.round((self.t[-1] - self.t[0]) / windowSize / (1.-overlap)))
         for i in xrange(nWindows):
-            tRange = self.t[0] + i*windowSize*overlap + (0, windowSize)
+            tRange = self.t[0] + i*windowSize*(1.-overlap) + (0, windowSize)
             traj = deepcopy(self)
             traj.isolateTimeRange(tRange)
             yield traj
@@ -1032,7 +1032,7 @@ class WormTrajectoryEnsembleGroup(object):
         if tau is None:
             tau = np.logspace(-1,3,80)
         for ens in self:
-            ens.plotMeanSquaredDisplacement(showPlot=False)
+            ens.plotMeanSquaredDisplacement(tau=tau, showPlot=False)
         plt.legend()
         if showPlot:
             plt.show()

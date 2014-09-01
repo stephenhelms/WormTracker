@@ -58,6 +58,10 @@ class TrajectoryModel(object):
 
 
 class Helms2014CentroidModel(TrajectoryModel):
+    Helms2014_mean_traits = np.array([1.00, 0.31, -1.41, -1.34, 1.93, 0.06, 2.78])
+    Helms2014_std_traits = np.array([0.54, 0.41, 0.18, 0.23, 0.26, 0.39, 0.36])
+    Helms2014_mode1 = np.array([0.43, 0.42, 0.42, 0.40, 0.45, 0.31, 0.01])
+
     def __init__(self):
         # reversals
         self.tau_fwd = None
@@ -235,6 +239,11 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.mu_s = vector[4]
         self.tau_s = vector[5]
         self.D_s = vector[6]
+
+    def parametersToMode(self):
+        p, labels, units = self.toParameterVector()
+        norm = (np.log10(np.abs(p))-self.Helms2014_mean_traits)/self.Helms2014_std_traits
+        return np.dot(norm, self.Helms2014_mode1)
 
     def _prepareSimulation(self, storeFile, location, nTimes):
         with h5py.File(storeFile) as f:
@@ -482,3 +491,5 @@ class Stephens2014PostureDynamicsModel(TrajectoryModel):
         plt.ylabel('Oscillation Frequency (Hz)')
         plt.show()
 
+    def _doSimulation(self, storeFile, location):
+        raise NotImplemented()
