@@ -457,6 +457,20 @@ class Stephens2014PostureDynamicsModel(TrajectoryModel):
         plt.ylabel('Oscillation Frequency (Hz)')
         plt.show()
 
+    def plotDynamicsSpaceDensity(self, dampRange=(0, 30), oscilRange=(0, 0.5)):
+        X, Y = np.mgrid[dampRange[0]:dampRange[1]:100j,
+                        oscilRange[0]:oscilRange[1]:100j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        values = np.vstack([np.array(self.tau).flatten(), np.array(self.foscil).flatten()])
+        kernel = stats.gaussian_kde(values)
+        Z = np.reshape(kernel(positions).T, X.shape)
+        plt.imshow(np.rot90(Z), extent=[dampRange[0],dampRange[1],oscilRange[0],oscilRange[1]],
+                   aspect='auto')
+        plt.xlabel('Damping Time (s)')
+        plt.ylabel('Oscillation Frequency (Hz)')
+        plt.colorbar()
+        plt.show()
+
     def plotDynamicsTime(self):
         ax1 = plt.subplot(211)
         plt.plot(np.array(self.tw), np.array(self.tau), '.')
