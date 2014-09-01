@@ -1032,7 +1032,7 @@ class WormTrajectoryEnsembleGroup(object):
         if tau is None:
             tau = np.logspace(-1,3,80)
         for ens in self:
-            ens.plotMeanSquaredDisplacement(showPlot=False)
+            ens.plotMeanSquaredDisplacement(tau=tau, showPlot=False)
         plt.legend()
         if showPlot:
             plt.show()
