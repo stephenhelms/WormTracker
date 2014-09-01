@@ -157,9 +157,9 @@ class WormTrajectory:
         self.clearAnalysisVariables()
 
     def asWindows(self, windowSize=100., overlap=0.5):
-        nWindows = int(np.round((self.t[-1] - self.t[0]) / windowSize / overlap))
+        nWindows = int(np.round((self.t[-1] - self.t[0]) / windowSize / (1.-overlap)))
         for i in xrange(nWindows):
-            tRange = self.t[0] + i*windowSize*overlap + (0, windowSize)
+            tRange = self.t[0] + i*windowSize*(1.-overlap) + (0, windowSize)
             traj = deepcopy(self)
             traj.isolateTimeRange(tRange)
             yield traj
