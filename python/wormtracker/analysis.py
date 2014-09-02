@@ -892,7 +892,7 @@ class WormTrajectoryEnsemble:
         if color is None:
             color = self.color
         l, ll, lu = self.ensembleAverage(lambda x: np.cumsum(x.ltheta) / np.sum(x.ltheta))
-        plt.plot(l, '.-', color=color)
+        plt.plot(l, '.-', color=color, label=self.name)
         plt.hold(True)
         plt.fill_between(xrange(l.shape[0]), ll, lu,
                          facecolor=color, alpha=0.3)
