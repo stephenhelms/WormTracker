@@ -377,6 +377,9 @@ class WormTrajectory:
             if bins is None:
                 bins = np.ceil(np.sqrt(np.sum(np.logical_not(self.badFrames))))
             s = self.getMaskedCentroid(self.s)
+            if self.revBoundaries is None:
+                self.identifyReversals()
+            s[self.nearRev] = ma.masked
             plt.hist(s.compressed(), bins, normed=True, facecolor=color)
         else:
             if bins is None:
