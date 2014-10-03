@@ -102,9 +102,9 @@ def extractStoreFileList(f):
 # functions for saving/loading trajectories and ensembles from yaml files/dictionaries
 def loadTrajectory(dataSource):
     if type(dataSource) is str:
-        with open(dataSource, 'r') as f:
+        with open(os.path.expandvars(dataSource), 'r') as f:
             dataSource = yaml.load(f)
-    f = h5py.File(dataSource['storeFile'], 'r')
+    f = h5py.File(os.path.expandvars(dataSource['storeFile']), 'r')
     if 'videoFilePath' in dataSource:
         videoFilePath = dataSource['videoFilePath']
     else:
@@ -123,7 +123,7 @@ def saveTrajectory(traj, output=None):
             'strain': traj.strain,
             'wormID': traj.wormID}
     if traj.videoFile is not None:
-        videoFilePath, videoFileName = os.path.split(traj.videoFile)
+        videoFilePath, videoFileName = os.path.split(os.path.expandvars(traj.videoFile))
         data['videoFilePath'] = videoFilePath
     if traj.frameRange is not None:
         data['frameRange'] = traj.frameRange
