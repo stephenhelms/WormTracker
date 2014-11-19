@@ -66,7 +66,9 @@ class WormImageProcessor:
         bgSE = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
                                          (self.backgroundDiskRadius+1,
                                           self.backgroundDiskRadius+1))
-        return 255-cv2.morphologyEx(image, cv2.MORPH_BLACKHAT, bgSE)
+        #blurred = cv2.blur(image, (self.wormDiskRadius, self.wormDiskRadius))
+        blurred = cv2.GaussianBlur(image, (self.wormDiskRadius, self.wormDiskRadius), 0.)
+        return 255-cv2.morphologyEx(blurred, cv2.MORPH_BLACKHAT, bgSE)
 
     def applyThreshold(self, image):
         junk, thresholded = cv2.threshold(image, 255*self.threshold,
