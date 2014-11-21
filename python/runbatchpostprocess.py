@@ -55,7 +55,7 @@ def main(argv):
     # postprocessing
     if args.serial:
         for storeFile in storeFiles:
-            with h5py.File(wv.storeFile, 'r+') as f:
+            with h5py.File(storeFile, 'r+') as f:
                 strains = f['worms'].keys()
                 for strain in strains:
                     worms = f['worms'][strain].keys()
