@@ -449,14 +449,14 @@ class WormTrajectoryPostProcessor:
                                       maxshape=(100,),
                                       dtype='f8')
         if self.ltheta is not None:
-            self.h5ref['ltheta'][...] = self.ltheta
+            self.h5ref['ltheta'][...] = np.real(self.ltheta)
         if 'vtheta' not in self.h5ref:
             self.h5ref.create_dataset('vtheta',
                                       (self.nAngles, self.nAngles),
                                       maxshape=(100, 100),
                                       dtype='f8')
         if self.vtheta is not None:
-            self.h5ref['vtheta'][...] = self.vtheta
+            self.h5ref['vtheta'][...] = np.real(self.vtheta)
 
 
 def _getMotionVariables(X, dt):
