@@ -1,16 +1,12 @@
-import os
 import numpy as np
 import numpy.ma as ma
 from numpy import linalg as LA
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import h5py
-import itertools
-import collections
 from scipy import stats
 
 
 def bootstrap(array, nSamples=1000):
+    if len(array.shape) == 1:
+        array = array[:, np.newaxis]
     nObserv, nVar = array.shape
     mu = np.zeros((nSamples, nVar))
     replaceIdx = np.random.randint(nObserv, size=(nSamples, 2))
@@ -19,9 +15,9 @@ def bootstrap(array, nSamples=1000):
         resampled[iold, :] = resampled[inew, :]
         mu[i, :] = np.mean(resampled, axis=0)
 
-    return (np.mean(mu, axis=0),
-            np.percentile(mu, 2.5, axis=0),
-            np.percentile(mu, 97.5, axis=0))
+    return (np.mean(mu.squeeze(), axis=0),
+            np.percentile(mu.squeeze(), 2.5, axis=0),
+            np.percentile(mu.squeeze(), 97.5, axis=0))
 
 
 def KLDiv(P, Q):
