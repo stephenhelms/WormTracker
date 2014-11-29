@@ -1,6 +1,61 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+import cv2
+
+
+class ThresholdedImageSelector(object):
+    def __init__(self, im):
+        self.ax = plt.gca()
+        self.im = im
+        self.x = None
+        self.y = None
+        self.im = im
+        self.implot = plt.imshow(im)
+        self.regions = self.getRegions()
+        self.ax.figure.canvas.mpl_connect('button_press_event',
+                                         self.on_click)
+        self.draw()
+
+    def getRegions(self):
+        contours, hierarchy = cv2.findContours(
+            np.uint8(self.im), cv2.RETR_CCOMP,
+            cv2.CHAIN_APPROX_SIMPLE)
+        return contours
+
+    def getClickedRegion(self, contours):
+        if (self.x is None) or (self.y is None):
+            return None
+        xy = (int(self.y), int(self.x))
+        inside = np.array([cv2.pointPolygonTest(contour, xy, False)
+                           for contour in contours])
+        selRegion = inside >= 0.
+        if np.any(selRegion):
+            print 'Region detected'
+            return contours[selRegion.nonzero()[0]]
+
+    def fillSelectedRegion(self, contour):
+        im = cv2.cvtColor(self.im.astype('uint8')*255,
+                          cv2.COLOR_GRAY2RGB)
+        if contour is not None:
+            cv2.drawContours(im,
+                             [contour],
+                             0, (255, 0, 0), -1)
+        self.implot.set_data(im)
+
+    def on_click(self, event):
+        if event.inaxes:
+            self.x = event.xdata
+            self.y = event.ydata
+        else:
+            self.x = None
+            self.y = None
+        self.draw()
+
+    def draw(self):
+        self.fillSelectedRegion(self.getClickedRegion(self.regions))
+        self.ax.figure.canvas.draw()
+
 
 # modified from http://stackoverflow.com/questions/12052379/ ...
 # matplotlib-draw-a-selection-area-in-the-shape-of-a-rectangle-with-the-mouse

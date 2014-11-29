@@ -178,6 +178,22 @@ class WormVideo:
             plt.show()
             region.foodCircle = sel.asXYR()
 
+    def selectNonWormRegionsToIgnore(self):
+        if self.firstFrame is None:
+            self.readFirstFrame()
+        raw_input("Click on the worm (if visible) in the thresholded image for each region...")
+        for region in self.regions:
+            ip = self.imageProcessor
+            cropped = wp.cropImageToRegion(self.firstFrame, region.cropRegion)
+            filtered = ip.applyBackgroundFilter(cropped)
+            ax1 = plt.subplot(1,2,1)
+            plt.imshow(filtered, plt.gray())
+            plt.subplot(1,2,2, sharex=ax1, sharey=ax1)
+            thresholded = ip.applyThreshold(filtered)
+            cleaned = ip.applyMorphologicalCleaning(thresholded)
+            selector = roitools.ThresholdedImageSelector(cleaned)
+            plt.show()
+
     def testBackgroundFilter(self):
         if self.firstFrame is None:
             self.readFirstFrame()
