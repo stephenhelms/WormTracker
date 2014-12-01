@@ -46,11 +46,17 @@ def getRegionConfigDict(region):
         'strainName': region.strainName,
         'wormName': region.wormName,
         'cropRegion': region.cropRegion,
+        'ignoredAreas': region.ignoredAreas
     }
     if region.foodCircle is not None:
         if type(region.foodCircle[0]) is not float:
             region.foodCircle = tuple(float(n) for n in region.foodCircle)
         config['foodCircle'] = region.foodCircle
+    if region.ignoredAreas is not None:
+        px = region.ignoredAreas.nonzero()
+        # yaml can't deal with a tuple of numpy arrays
+        px = tuple(list([int(i) for i in dlist]) for dlist in px)
+        config['ignoredAreas'] = px
     return config
 
 
@@ -86,6 +92,8 @@ def loadWormVideos(f):
                                  region['wormName'])
             if 'foodCircle' in region:
                 wr.foodCircle = region['foodCircle']
+            if 'ignoredAreas' in region:
+                wr.ignoredAreas = region['ignoredAreas']
 
         # re-initialize state
         video.readFirstFrame(askForFrameRate=False)

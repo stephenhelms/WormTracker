@@ -26,12 +26,11 @@ class ThresholdedImageSelector(object):
     def getClickedRegion(self, contours):
         if (self.x is None) or (self.y is None):
             return None
-        xy = (int(self.y), int(self.x))
+        xy = (int(self.x), int(self.y))
         inside = np.array([cv2.pointPolygonTest(contour, xy, False)
                            for contour in contours])
         selRegion = inside >= 0.
         if np.any(selRegion):
-            print 'Region detected'
             return contours[selRegion.nonzero()[0]]
 
     def fillSelectedRegion(self, contour):
@@ -43,17 +42,25 @@ class ThresholdedImageSelector(object):
                              0, (255, 0, 0), -1)
         self.implot.set_data(im)
 
+    def getImageNonSelectedRegions(self):
+        im = cv2.cvtColor(self.im.astype('uint8')*255,
+                          cv2.COLOR_GRAY2RGB)
+        contour = self.getClickedRegion(self.regions)
+        if contour is not None:
+            cv2.drawContours(im,
+                             [contour],
+                             0, (0, 0, 0), -1)
+        return im[:, :, 0].squeeze()
+
     def on_click(self, event):
         if event.inaxes:
             self.x = event.xdata
             self.y = event.ydata
-        else:
-            self.x = None
-            self.y = None
         self.draw()
 
     def draw(self):
-        self.fillSelectedRegion(self.getClickedRegion(self.regions))
+        clicked = self.getClickedRegion(self.regions)
+        self.fillSelectedRegion(clicked)
         self.ax.figure.canvas.draw()
 
 

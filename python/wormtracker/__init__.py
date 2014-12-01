@@ -193,6 +193,7 @@ class WormVideo:
             cleaned = ip.applyMorphologicalCleaning(thresholded)
             selector = roitools.ThresholdedImageSelector(cleaned)
             plt.show()
+            region.ignoredAreas = selector.getImageNonSelectedRegions()
 
     def testBackgroundFilter(self):
         if self.firstFrame is None:
@@ -230,6 +231,9 @@ class WormVideo:
         plt.imshow(thresholded, plt.gray())
         plt.subplot(1,2,2, sharex=ax1, sharey=ax1)
         cleaned = ip.applyMorphologicalCleaning(thresholded)
+        # remove ignored areas
+        if region.ignoredAreas is not None:
+            cleaned[region.ignoredAreas==255] = False
         plt.imshow(cleaned, plt.gray())
         plt.show()
 
@@ -241,6 +245,13 @@ class WormVideo:
             cropped = wp.cropImageToRegion(self.firstFrame, region.cropRegion)
             filtered = ip.applyBackgroundFilter(cropped)
             thresholded = ip.applyThreshold(filtered)
+            # remove ignored areas
+            if region.ignoredAreas is not None:
+                # can be either a 2D image or a list of pixel indexes
+                if len(region.ignoredAreas.shape) > 1:
+                    thresholded = np.logical_not(thresholded, region.ignoredAreas)
+                else:
+                    thresholded[self.ignoredAreas] = False
             cleaned = ip.applyMorphologicalCleaning(thresholded)
             possibleWorms = ip.identifyPossibleWorms(cleaned)
             if len(possibleWorms) > 0:
@@ -347,6 +358,7 @@ class WormVideoRegion:
         self.frameRate = 11.5
         self.frameSize = (2736, 2192)
         self.foodCircle = None
+        self.ignoredAreas = None
         self.videoFile = videoFile
         self.imageProcessor = imageProcessor
         self.resultsStoreFile = resultsStoreFile
@@ -390,6 +402,9 @@ class WormVideoRegion:
         tFrame = self.imageProcessor.applyThreshold(fFrame)
         # morphological cleaning
         clFrame = self.imageProcessor.applyMorphologicalCleaning(tFrame)
+        # remove ignored areas
+        if self.ignoredAreas is not None:
+            clFrame[self.ignoredAreas == 255] = False
         # worm identification
         ip = self.imageProcessor
         # identify possible worms in image
@@ -440,6 +455,9 @@ class WormVideoRegion:
             if 'cropRegion' not in g:
                 g.create_dataset('cropRegion', (4,), dtype='int32')
                 g.create_dataset('foodCircle', (3,), dtype='float64')
+                g.create_dataset('ignoredAreas', self.frameSize,
+                                 dtype='uint8', fillvalue=0,
+                                 compression='gzip')
 
             # write configuration
             g['cropRegion'][...] = self.cropRegion
@@ -447,6 +465,14 @@ class WormVideoRegion:
                 g['foodCircle'][...] = self.foodCircle
             else:
                 g['foodCircle'][...] = (np.nan, np.nan, np.nan)
+
+            if self.ignoredAreas is not None:
+                if isinstance(self.ignoredAreas, tuple):
+                    I = np.zeros(self.frameSize)
+                    I[self.ignoredAreas] = 255
+                    g['ignoredAreas'][...] = I
+                else:    
+                    g['ignoredAreas'][...] = self.ignoredAreas
 
             # create worm observation datasets
             n = self.nFrames
