@@ -245,14 +245,10 @@ class WormVideo:
             cropped = wp.cropImageToRegion(self.firstFrame, region.cropRegion)
             filtered = ip.applyBackgroundFilter(cropped)
             thresholded = ip.applyThreshold(filtered)
+            cleaned = ip.applyMorphologicalCleaning(thresholded)
             # remove ignored areas
             if region.ignoredAreas is not None:
-                # can be either a 2D image or a list of pixel indexes
-                if len(region.ignoredAreas.shape) > 1:
-                    thresholded = np.logical_not(thresholded, region.ignoredAreas)
-                else:
-                    thresholded[self.ignoredAreas] = False
-            cleaned = ip.applyMorphologicalCleaning(thresholded)
+                cleaned[region.ignoredAreas==255] = False
             possibleWorms = ip.identifyPossibleWorms(cleaned)
             if len(possibleWorms) > 0:
                 likelyWorm = max(possibleWorms, key=lambda worm: worm[1])
@@ -468,8 +464,9 @@ class WormVideoRegion:
 
             if self.ignoredAreas is not None:
                 if isinstance(self.ignoredAreas, tuple):
-                    I = np.zeros(self.frameSize)
+                    I = np.zeros((self.cropRegion[2], self.cropRegion[3]))
                     I[self.ignoredAreas] = 255
+                    self.ignoredAreas = I
                     g['ignoredAreas'][...] = I
                 else:    
                     g['ignoredAreas'][...] = self.ignoredAreas
