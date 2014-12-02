@@ -451,7 +451,8 @@ class WormVideoRegion:
             if 'cropRegion' not in g:
                 g.create_dataset('cropRegion', (4,), dtype='int32')
                 g.create_dataset('foodCircle', (3,), dtype='float64')
-                g.create_dataset('ignoredAreas', self.frameSize,
+                g.create_dataset('ignoredAreas', (self.cropRegion[3], 
+                                                  self.cropRegion[2]),
                                  dtype='uint8', fillvalue=0,
                                  compression='gzip')
 
@@ -464,7 +465,7 @@ class WormVideoRegion:
 
             if self.ignoredAreas is not None:
                 if isinstance(self.ignoredAreas, tuple):
-                    I = np.zeros((self.cropRegion[2], self.cropRegion[3]))
+                    I = np.zeros((self.cropRegion[3], self.cropRegion[2]))
                     I[self.ignoredAreas] = 255
                     self.ignoredAreas = I
                     g['ignoredAreas'][...] = I
