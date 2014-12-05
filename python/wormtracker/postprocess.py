@@ -18,7 +18,7 @@ class WormTrajectoryPostProcessor:
     # segment settings
     max_n_missing = 10
     max_d_um = 10.
-    max_segment_frames = 500
+    max_segment_frames = 10000
     min_segment_size = 150
 
     # head assignment settings (centoid only method)
