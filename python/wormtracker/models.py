@@ -11,6 +11,7 @@ import scipy.optimize as opt
 import scipy.integrate as scint
 import scipy.sparse.linalg as SLA
 import statsmodels.api as sm
+import lmfit
 from tsstats import *
 import sde
 import stochprocess
@@ -101,13 +102,20 @@ class Helms2014CentroidModel(TrajectoryModel):
                           for traj in trajectory.asWindows(windowSize)]).T
             C = C.mean(axis=1)
         tau = lags / trajectory.frameRate
-        p, pcov = opt.curve_fit(self._reversalFitFunction, tau, C, [0, 0.5])
-        f_rev = 0.5 - np.sqrt(p[1]/4)
-        self.tau_rev = 10**p[0]/(1.-f_rev)
-        self.tau_fwd = 10**p[0]/f_rev
+
+        # do the bounded fit
+        params = lmfit.Parameters()
+        params.add('log_tau_eff', value=0.)
+        params.add('Cinf', value=0.5, min=0., max=1.)
+
+        p = lmfit.minimize(self._reversalFitResidual, params, args=(tau, C))
+
+        f_rev = 0.5 - np.sqrt(params['Cinf']/4)
+        self.tau_rev = 10**params['log_tau_eff']/(1.-f_rev)
+        self.tau_fwd = 10**params['log_tau_eff']/f_rev
         if plotFit:
             plt.plot(tau, C, 'k.')
-            plt.plot(tau, self._reversalFitFunction(tau, p[0], p[1]), 'r-')
+            plt.plot(tau, self._reversalFitFunction(tau, params['log_tau_eff'], params['Cinf']), 'r-')
             plt.xlabel(r'$\tau$ (s)')
             plt.ylabel(r'$\langle \vec{\Delta\psi}(0) \cdot \vec{\Delta\psi}(\tau) \rangle$')
             textstr = '$\\tau_{\mathrm{rev}}=%.2f$ s\n$\\tau_{\mathrm{fwd}}=%.2f$ s'%(self.tau_rev, self.tau_fwd)
@@ -117,6 +125,12 @@ class Helms2014CentroidModel(TrajectoryModel):
             ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=14,
                     horizontalalignment='right', verticalalignment='top', bbox=props)
             plt.show()
+
+    def _reversalFitResidual(self, vars, tau, data):
+        log_tau_eff = float(vars['log_tau_eff'])
+        Cinf = float(vars['Cinf'])
+        model = self._reversalFitFunction(tau, log_tau_eff, Cinf)
+        return (data-model)
 
     def _reversalFitFunction(self, tau, log_tau_eff, Cinf):
         return (1.-Cinf)*np.exp(-tau/10**log_tau_eff) + Cinf
