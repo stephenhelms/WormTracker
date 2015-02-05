@@ -277,7 +277,8 @@ class WormTrajectory:
         data[np.isnan(data)] = ma.masked
         return data
 
-    def plotTrajectory(self, color='k', showFrame=True, showPlot=True):
+    def plotTrajectory(self, color='k', showFrame=True, showPlot=True,
+                       xlim=(0,10000), ylim=(0,10000)):
         if showFrame and self.firstFrame is not None:
             plt.imshow(self.firstFrame, plt.gray(),
                        origin='lower',
@@ -294,8 +295,10 @@ class WormTrajectory:
                                 radius=self.foodCircle[-1],
                                 color='r', fill=False)
             plt.gca().add_patch(circle)
-        plt.xlim((0, 10000))
-        plt.ylim((0, 10000))
+        if xlim is not None:
+            plt.xlim(xlim)
+        if ylim is not None:
+            plt.ylim(ylim)
         plt.xlabel('x (um)')
         plt.ylabel('y (um)')
         plt.gca().set_aspect('equal')
