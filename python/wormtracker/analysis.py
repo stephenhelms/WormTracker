@@ -410,7 +410,7 @@ class WormTrajectory:
                 s[traj.nearRev] = ma.masked
                 return s.var()*acf(s, lags)
 
-            C = np.array([result(traj)
+            C = ma.array([result(traj)
                           for traj in self.asWindows(windowSize)]).T
             C = C.mean(axis=1)
         tau = lags / self.frameRate
@@ -430,13 +430,13 @@ class WormTrajectory:
         lags = np.round(np.linspace(0, np.round(maxT*self.frameRate), 200)).astype(int)
         if windowSize is None:
             psi = self.getMaskedPosture(self.psi)
-            C = dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+            C = dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags)
         else:
             def result(traj):
                 psi = traj.getMaskedPosture(traj.psi)
-                return dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+                return dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags)
 
-            C = np.array([result(traj)
+            C = ma.array([result(traj)
                           for traj in self.asWindows(windowSize)]).T
             C = C.mean(axis=1)
         tau = lags / self.frameRate
@@ -470,7 +470,7 @@ class WormTrajectory:
         n = int(np.round(maxT*self.frameRate))
         tau = range(n)/self.frameRate
         psi = self.getMaskedPosture(self.psi)
-        C = circacf(psi, n)
+        C = dotacf(ma.array([ma.cos(psi), ma.sin(psi)]), n)
         return tau, C
 
     def plotBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):
