@@ -117,6 +117,8 @@ class WormTrajectory:
                               frameRange=deepcopy(self.frameRange, memo))
         if self.videoFile is not None:
             traj.videoFile = deepcopy(self.videoFile, memo)
+        if self.excluded is not None:
+            traj.excluded = deepcopy(self.excluded, memo)
         return traj
 
     def clearAnalysisVariables(self):
