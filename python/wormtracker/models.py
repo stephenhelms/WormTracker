@@ -33,11 +33,10 @@ class TrajectoryModel(object):
         pass
 
     def simulate(self, storeFile, location, nTimes=10):
-        self._prepareSimulation(storeFile, h5loc, nTimes)
+        self._prepareSimulation(storeFile, location, nTimes)
         print 'Running simulations...'
         for i in xrange(nTimes):
             print '{0} of {1}'.format(i, nTimes)
-            location = location
             self._doSimulation(storeFile, location, i)
 
     @abstractmethod
