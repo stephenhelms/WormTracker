@@ -58,9 +58,8 @@ class TrajectoryModel(object):
 
 
 class Helms2014CentroidModel(TrajectoryModel):
-    Helms2014_mean_traits = np.array([1.00, 0.31, -1.41, -1.34, 1.93, 0.06, 2.78])
-    Helms2014_std_traits = np.array([0.54, 0.41, 0.18, 0.23, 0.26, 0.39, 0.36])
-    Helms2014_mode1 = np.array([0.43, 0.42, 0.42, 0.40, 0.45, 0.31, 0.01])
+    Helms2014_mean_traits = np.array([1.9327, 0.0642, 2.7815, -1.4129, -1.3353, 1.0023, 0.3089])
+    Helms2014_mode1 = np.array([0.2729, 0.2871, -0.0554, 0.1470, 0.1754, 0.7188, 0.5206])
 
     def __init__(self):
         # reversals
@@ -227,35 +226,37 @@ class Helms2014CentroidModel(TrajectoryModel):
         return _speedFitFunction(tau, np.log10(self.tau_s), np.log10(self.D_s))
 
     def toParameterVector(self):
-        return (np.array([self.tau_fwd,
-                         self.tau_rev,
+        return (np.array([self.mu_s,
+                         self.tau_s,
+                         self.D_s,
                          self.k_psi,
                          self.D_psi,
-                         self.mu_s,
-                         self.tau_s,
-                         self.D_s]),
-                [r'\tau_{fwd}', r'\tau_{rev}', r'k_\psi',
-                 r'D_\psi', r'\mu_s', r'\tau_s', r'D_s'],
-                ['s', 's', 'rad/s', r'rad^2/s', r'\micro m/s',
-                 's', r'(\micro m/s)^2 s^{-1}'])
+                         self.tau_fwd,
+                         self.tau_rev]),
+                [r'\mu_s', r'\tau_s', r'D_s', 
+                 r'k_\psi', r'D_\psi',
+                 r'\tau_{fwd}', r'\tau_{rev}'],
+                [r'\micro m/s', 's', r'(\micro m/s)^2 s^{-1}',
+                 'rad/s', r'rad^2/s',
+                 's', 's'])
 
     def fromParameterVector(self, vector):
-        # reversals
-        self.tau_fwd = vector[0]
-        self.tau_rev = vector[1]
+        # speed
+        self.mu_s = vector[0]
+        self.tau_s = vector[1]
+        self.D_s = vector[2]
 
         # bearing
-        self.k_psi = vector[2]
-        self.D_psi = vector[3]
+        self.k_psi = vector[3]
+        self.D_psi = vector[4]
 
-        # speed
-        self.mu_s = vector[4]
-        self.tau_s = vector[5]
-        self.D_s = vector[6]
+        # reversals
+        self.tau_fwd = vector[5]
+        self.tau_rev = vector[6]
 
     def parametersToMode(self):
         p, labels, units = self.toParameterVector()
-        norm = (np.log10(np.abs(p))-self.Helms2014_mean_traits)/self.Helms2014_std_traits
+        norm = (np.log10(np.abs(p))-self.Helms2014_mean_traits)
         return np.dot(norm, self.Helms2014_mode1)
 
     def _prepareSimulation(self, storeFile, location, nTimes):
