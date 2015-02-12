@@ -293,15 +293,16 @@ class Helms2014CentroidModel(TrajectoryModel):
             psi = self._simulateBodyBearing()
             g['psi'][i, :] = psi
             r = self._simulateReversals()
-            dpsi = np.zeros((n,))
-            dpsi[r == 1] = np.pi
+            dpsi = np.zeros((r.shape[0],))
+            dpsi[~r] = np.pi
             g['dpsi'][i, :] = dpsi
             phi = psi + dpsi
             g['phi'][i, :] = phi
 
-            v = s*np.array([np.cos(phi), np.sin(phi)])
+            v = (s*np.array([np.cos(phi), np.sin(phi)])).T
             g['v'][i, ...] = v
-            X = scint.cumtrapz(v, dx=self.dt)
+            X = np.zeros((r.shape[0], 2))
+            X[1:,:] = scint.cumtrapz(v, dx=self.dt, axis=0)
             g['X'][i, ...] = X
 
     def _simulateSpeed(self):

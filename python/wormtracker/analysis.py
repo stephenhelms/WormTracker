@@ -168,45 +168,37 @@ class WormTrajectory:
 
     def identifyReversals(self, transitionWindow=2.):
         dpsi = self.getMaskedPosture(self.dpsi)
-        rev = np.abs(dpsi)>np.pi/2.
+        rev = ma.abs(dpsi)>np.pi/2.
 
-        ii = 1
         inRev = False
         state = np.zeros(self.t.shape, int)
         state[~rev] = 1
         state[rev] = 2
-        if np.any(rev.mask):
-            state[rev.mask] = 0
+        state[ma.getmaskarray(rev)] = 0
         self.state = state
 
-        revBoundaries = ma.empty((1,2),int)
+        revBoundaries = []
+        currentRev = ma.zeros((2,))
         for j in xrange(1,self.t.shape[0]-2):
             if not inRev:
-                if (state[j]==2 & state[j+1]==2 |
-                    state[j]==2 & state[j+1]==0 & state[j+2]==2):
+                if ((state[j]==2 & state[j+1]==2) |
+                    (state[j]==2 & state[j+1]==0 & state[j+2]==2)):
                     if state[j-1] == 0:
-                        revBoundaries[ii,0] = ma.masked
+                        currentRev[0] = ma.masked
                     else:
-                        revBoundaries[ii,0] = j
+                        currentRev[0] = j
                     inRev = True
             else:
-                if (state[j]==1 & state[j+1]==1 |
-                    state[j]==1 & state[j+1]==0 & state[j+2]==1):
-                    revBoundaries[ii,1] = j
+                if ((state[j]==1 & state[j+1]==1) |
+                    (state[j]==1 & state[j+1]==0 & state[j+2]==1)):
+                    currentRev[1] = j
                     inRev = False
-                    ii = ii+1
-                elif (state[j]==1 & state[j+1]==0 & state[j+2]==0):
-                    revBoundaries[ii,1] = j
-                    inRev = False
-                    ii = ii+1
+                    revBoundaries.append(currentRev.copy())
                 elif (state[j]==0 & state[j+1]==0):
-                    revBoundaries[ii,1] = ma.masked
-                    inRev=False
-                    ii = ii+1
-
-        if revBoundaries[-1,1] == 0:
-            revBoundaries[-1,1] = ma.masked
-        self.revBoundaries = revBoundaries
+                    currentRev[1] = ma.masked
+                    inRev = False
+                    revBoundaries.append(currentRev.copy())
+        self.revBoundaries = ma.array(revBoundaries, dtype='int')
 
         revEdges = self.revBoundaries[:].compressed()
         for boundary in revEdges:
