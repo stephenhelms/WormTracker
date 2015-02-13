@@ -306,7 +306,8 @@ class Helms2014CentroidModel(TrajectoryModel):
             g['X'][i, ...] = X
 
     def _simulateSpeed(self):
-        ou = sde.OrnsteinUhlenbeck(self.tau_s, self.mu_s, np.sqrt(2.*self.D_s))
+        ou = sde.OrnsteinUhlenbeck(self.tau_s, self.mu_s, np.sqrt(2.*self.D_s),
+                                   positive=True)
         return ou.integrateEuler(0., self.duration, self.dt, self.mu_s)[1]
 
     def _simulateBodyBearing(self):
