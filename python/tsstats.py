@@ -31,35 +31,6 @@ def acf(x, lags=500, exclude=None):
     return C
 
 
-def ccf(x, y, lags):
-    x = x - x.mean()  # remove mean
-    y = y - y.mean()
-    if type(lags) is int:
-        lags = np.arange(lags)
-    C = ma.zeros((len(lags),))
-    sigma2 = x.std()*y.std()
-    for i, l in enumerate(lags):
-        if l == 0:
-            C[i] = (x*y).mean()/sigma2
-        else:
-            C[i] = (x[:-l]*y[l:]).mean()/sigma2
-    return C
-
-
-def acv(k, List):
-    '''
-    Autocovariance
-    k is the lag order
-    '''
-    y = List.copy()
-    y = y - y.mean()
-
-    if k == 0:
-        return (y*y).mean()
-    else:
-        return (y[:-k]*y[k:]).mean()
-
-
 def dotacf(x, lags=500, exclude=None):
     if exclude is None:
         exclude = np.zeros(x.shape)
@@ -79,29 +50,6 @@ def dotacf(x, lags=500, exclude=None):
             x1[reject, :] = ma.masked
             C[i] = (x0*x1).sum(axis=1).mean()
     return C
-
-
-def pacfe(p,j,List):
-    '''
-    Partial autocorrelation function estimates
-    p is the order of the AR(p) process
-    j is the coefficient in an AR(p) process
-    '''
-    if p==2 and j==1:
-        return (acf(j,List)*(1-acf(p,List)))/(1-(acf(j,List))**2)
-    elif p==2 and j==2:
-        return (acf(2,List)-(acf(1,List))**2)/(1-(acf(1,List))**2)
-    elif p==j and p!=2 and j!=2:
-        c=0
-        for a in range(1,p):
-            c+=pacfe(p-1,a,List)*acf(p-a,List)
-        d=0
-        for b in range(1,p):
-            d+=pacfe(p-1,b,List)*acf(b,List)
-        return (acf(p,List)-c)/(1-d)
-    else: 
-        return pacfe(p-1,j,List)-pacfe(p,p,List)*pacfe(p-1,p-j,List)
-
 
 
 def drift(x, lags=500, exclude=None):
@@ -151,7 +99,7 @@ def nextpow2(n):
     return 2**m_i
 
 
-def phaserand(X, independent=False, reduceHighFreqNoise=True):
+def phaserand(X, independent=False):
     '''
     Generates a randomized surrogate dataset for X, preserving linear temporal
     correlations. If independent is False (default), linear correlations
@@ -179,30 +127,13 @@ def phaserand(X, independent=False, reduceHighFreqNoise=True):
     if len(X.shape) == 1:
         X = X[:, np.newaxis]
 
-
     # Deal with missing data
     if isinstance(X, ma.MaskedArray):
-        # truncate all missing data at beginning and end
-        idxNotAllMissing = (~np.all(X.mask, axis=1)).nonzero()[0]
-        X = X[idxNotAllMissing[0]:idxNotAllMissing[-1], :]
-        X = X.filled(X.mean(axis=0))  # fill interior mask with the mean
-
-    # Reduce high-frequency noise by min difference between first and last
-    if reduceHighFreqNoise:
-        delta = X - X[0, :]
-        threshold = 1e-3*np.std(X, axis=0)
-        # find last pt in which all the channels are about the same as the beginning
-        # and also the index is even
-        goodEndPt = np.nonzero((np.all(np.abs(delta) < threshold, axis=1)) &
-                               (np.arange(0, X.shape[1]) % 2 == 0))[0][-1]
-        if goodEndPt > X.shape[0]/2:  # make sure we keep at least half the data
-            X = X[:goodEndPt, :]
+        X = X.filled(X.mean(axis=0))  # fill missing values with the mean
 
     # Fourier transform and extract amplitude and phases
     # The frequencies are shifted so 0 is centered (fftshift)
-    N = X.shape[0] #int(nextpow2(X.shape[0]))  # size for FFT
-    if N % 2 != 0:
-        N = N-1
+    N = int(nextpow2(X.shape[0]))  # size for FFT
     h = np.floor(N/2)  # half the length of the data
     Z = np.fft.fft(X, N, axis=0)
     M = np.fft.fftshift(np.abs(Z), axes=0)  # the amplitudes
@@ -228,6 +159,7 @@ def phaserand(X, independent=False, reduceHighFreqNoise=True):
     # Reconstruct the signal from the original amplitude and the new phases
     z2 = M*np.exp(newphase*1.j)
 
-    # Return the time-domain signal
+    # Return the time-domain signal (have to undo the fftshift and keep the
+    # orignal length)
     return np.fft.ifft(np.fft.ifftshift(z2, axes=0),
-                       axis=0).real.squeeze()
+                       axis=0).real[:X.shape[0], :].squeeze()
