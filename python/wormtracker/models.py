@@ -75,6 +75,8 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.tau_s = None
         self.D_s = None
 
+        self.length = 1
+
         # simulation settings
         self.duration = 30.*60.
         self.dt = 1./11.5
@@ -83,6 +85,7 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.fitReversals(trajectory, windowSize, plotFit)
         self.fitBearing(trajectory, windowSize, plotFit)
         self.fitSpeed(trajectory, windowSize, plotFit)
+        self.length = trajectory.length
 
     def fitReversals(self, trajectory, windowSize=None, plotFit=False):
         lags = np.arange(0, np.round(10.*trajectory.frameRate))
@@ -93,8 +96,11 @@ class Helms2014CentroidModel(TrajectoryModel):
         else:
             def getVectorDpsi(traj):
                 dpsi = traj.getMaskedPosture(traj.dpsi)
-                vdpsi = ma.array([ma.cos(dpsi), ma.sin(dpsi)]).T
-                return vdpsi
+                if float(len(dpsi.compressed()))/float(len(dpsi)) > 0.2:
+                    vdpsi = ma.array([ma.cos(dpsi), ma.sin(dpsi)]).T
+                    return vdpsi
+                else:
+                    return ma.zeros((len(dpsi), 2))*ma.masked
 
             C = ma.array([dotacf(getVectorDpsi(traj), lags)
                           for traj in trajectory.asWindows(windowSize)]).T
@@ -147,20 +153,30 @@ class Helms2014CentroidModel(TrajectoryModel):
 
     def fitBearingDrift(self, trajectory, windowSize=None, plotFit=False):
         lags = np.linspace(0, np.round(50.*trajectory.frameRate), 200)
+        tau = lags / trajectory.frameRate
         if windowSize is None:
             psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
             D = drift(psi, lags)
+            p = np.polyfit(tau, D, 1)
+            self.k_psi = p[0]
         else:
             def result(traj):
-                psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
-                return drift(psi, lags)
+                psi = trajectory.getMaskedPosture(trajectory.psi)
+                if float(len(psi.compressed()))/float(len(psi)) > 0.2:
+                    psi = unwrapma(psi)
+                    return ma.array(drift(psi, lags))
+                else:
+                    return ma.zeros((len(lags),))*ma.masked
 
             D = ma.array([result(traj)
-                          for traj in trajectory.asWindows(windowSize)]).T
-            D = D.mean(axis=1)
-        tau = lags / trajectory.frameRate
-        p = np.polyfit(tau, D, 1)
-        self.k_psi = p[0]
+                          for traj in trajectory.asWindows(windowSize)])
+            k = np.array([np.polyfit(tau, Di, 1)[0]
+                          for Di in D
+                          if Di.compressed().shape[0]>50])
+            self.k_psi = ma.abs(k).mean()
+            D = ma.abs(D).T.mean(axis=1)
+        
+        
         if plotFit:
             plt.plot(tau, D, 'k.')
             plt.plot(tau, np.polyval(p, tau), 'r-')
@@ -232,13 +248,14 @@ class Helms2014CentroidModel(TrajectoryModel):
                          self.k_psi,
                          self.D_psi,
                          self.tau_fwd,
-                         self.tau_rev]),
+                         self.tau_rev,
+                         self.length]),
                 [r'\mu_s', r'\tau_s', r'D_s', 
                  r'k_\psi', r'D_\psi',
-                 r'\tau_{fwd}', r'\tau_{rev}'],
+                 r'\tau_{fwd}', r'\tau_{rev}', r'length'],
                 [r'\micro m/s', 's', r'(\micro m/s)^2 s^{-1}',
                  'rad/s', r'rad^2/s',
-                 's', 's'])
+                 's', 's', 'um'])
 
     def fromParameterVector(self, vector):
         # speed
