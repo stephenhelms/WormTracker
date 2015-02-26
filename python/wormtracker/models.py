@@ -112,11 +112,15 @@ class Helms2014CentroidModel(TrajectoryModel):
         params.add('log_tau_eff', value=0.)
         params.add('Cinf', value=0.5, min=0., max=1.)
 
-        p = lmfit.minimize(self._reversalFitResidual, params, args=(tau, C))
+        if C.compressed().shape[0]>0:
+            p = lmfit.minimize(self._reversalFitResidual, params, args=(tau, C))
 
-        f_rev = 0.5 - np.sqrt(params['Cinf']/4)
-        self.tau_rev = 10**params['log_tau_eff']/(1.-f_rev)
-        self.tau_fwd = 10**params['log_tau_eff']/f_rev
+            f_rev = 0.5 - np.sqrt(params['Cinf']/4)
+            self.tau_rev = 10**params['log_tau_eff']/(1.-f_rev)
+            self.tau_fwd = 10**params['log_tau_eff']/f_rev
+        else:
+            self.tau_rev = ma.masked
+            self.tau_fwd = ma.masked
         if plotFit:
             plt.plot(tau, C, 'k.')
             plt.plot(tau, self._reversalFitFunction(tau, params['log_tau_eff'], params['Cinf']), 'r-')
@@ -161,7 +165,7 @@ class Helms2014CentroidModel(TrajectoryModel):
             self.k_psi = p[0]
         else:
             def result(traj):
-                psi = trajectory.getMaskedPosture(trajectory.psi)
+                psi = traj.getMaskedPosture(traj.psi)
                 if float(len(psi.compressed()))/float(len(psi)) > 0.2:
                     psi = unwrapma(psi)
                     return ma.array(drift(psi, lags))
@@ -179,7 +183,7 @@ class Helms2014CentroidModel(TrajectoryModel):
         
         if plotFit:
             plt.plot(tau, D, 'k.')
-            plt.plot(tau, np.polyval(p, tau), 'r-')
+            plt.plot(tau, self.k_psi*tau, 'r-')
             plt.xlabel(r'$\tau$ (s)')
             plt.ylabel(r'$\langle \psi(\tau) - \psi(0) \rangle$ (rad)')
             textstr = '$k_\psi=%.2f$ rad/s'%(self.k_psi)
