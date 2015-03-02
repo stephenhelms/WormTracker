@@ -117,6 +117,8 @@ class WormTrajectory:
                               frameRange=deepcopy(self.frameRange, memo))
         if self.videoFile is not None:
             traj.videoFile = deepcopy(self.videoFile, memo)
+        if self.excluded is not None:
+            traj.excluded = deepcopy(self.excluded, memo)
         return traj
 
     def clearAnalysisVariables(self):
@@ -166,50 +168,42 @@ class WormTrajectory:
 
     def identifyReversals(self, transitionWindow=2.):
         dpsi = self.getMaskedPosture(self.dpsi)
-        rev = np.abs(dpsi)>np.pi/2.
+        rev = ma.abs(dpsi)>np.pi/2.
 
-        ii = 1
         inRev = False
         state = np.zeros(self.t.shape, int)
         state[~rev] = 1
         state[rev] = 2
-        if np.any(rev.mask):
-            state[rev.mask] = 0
+        state[ma.getmaskarray(rev)] = 0
         self.state = state
 
-        revBoundaries = ma.empty((1,2),int)
+        revBoundaries = []
+        currentRev = ma.zeros((2,))
         for j in xrange(1,self.t.shape[0]-2):
             if not inRev:
-                if (state[j]==2 & state[j+1]==2 |
-                    state[j]==2 & state[j+1]==0 & state[j+2]==2):
+                if ((state[j]==2 & state[j+1]==2) |
+                    (state[j]==2 & state[j+1]==0 & state[j+2]==2)):
                     if state[j-1] == 0:
-                        revBoundaries[ii,0] = ma.masked
+                        currentRev[0] = ma.masked
                     else:
-                        revBoundaries[ii,0] = j
+                        currentRev[0] = j
                     inRev = True
             else:
-                if (state[j]==1 & state[j+1]==1 |
-                    state[j]==1 & state[j+1]==0 & state[j+2]==1):
-                    revBoundaries[ii,1] = j
+                if ((state[j]==1 & state[j+1]==1) |
+                    (state[j]==1 & state[j+1]==0 & state[j+2]==1)):
+                    currentRev[1] = j
                     inRev = False
-                    ii = ii+1
-                elif (state[j]==1 & state[j+1]==0 & state[j+2]==0):
-                    revBoundaries[ii,1] = j
-                    inRev = False
-                    ii = ii+1
+                    revBoundaries.append(currentRev.copy())
                 elif (state[j]==0 & state[j+1]==0):
-                    revBoundaries[ii,1] = ma.masked
-                    inRev=False
-                    ii = ii+1
-
-        if revBoundaries[-1,1] == 0:
-            revBoundaries[-1,1] = ma.masked
-        self.revBoundaries = revBoundaries
+                    currentRev[1] = ma.masked
+                    inRev = False
+                    revBoundaries.append(currentRev.copy())
+        self.revBoundaries = ma.array(revBoundaries, dtype='int')
 
         revEdges = self.revBoundaries[:].compressed()
         for boundary in revEdges:
-            self.nearRev[(self.t>boundary-transitionWindow/2.) &
-                         (self.t<boundary+transitionWindow/2.)] = True
+            self.nearRev[(self.t>boundary/self.frameRate-transitionWindow/2.) &
+                         (self.t<boundary/self.frameRate+transitionWindow/2.)] = True
 
 
     def readFirstFrame(self):
@@ -275,7 +269,8 @@ class WormTrajectory:
         data[np.isnan(data)] = ma.masked
         return data
 
-    def plotTrajectory(self, color='k', showFrame=True, showPlot=True):
+    def plotTrajectory(self, color='k', showFrame=True, showPlot=True,
+                       xlim=(0,10000), ylim=(0,10000)):
         if showFrame and self.firstFrame is not None:
             plt.imshow(self.firstFrame, plt.gray(),
                        origin='lower',
@@ -292,8 +287,10 @@ class WormTrajectory:
                                 radius=self.foodCircle[-1],
                                 color='r', fill=False)
             plt.gca().add_patch(circle)
-        plt.xlim((0, 10000))
-        plt.ylim((0, 10000))
+        if xlim is not None:
+            plt.xlim(xlim)
+        if ylim is not None:
+            plt.ylim(ylim)
         plt.xlabel('x (um)')
         plt.ylabel('y (um)')
         plt.gca().set_aspect('equal')
@@ -405,7 +402,7 @@ class WormTrajectory:
                 s[traj.nearRev] = ma.masked
                 return s.var()*acf(s, lags)
 
-            C = np.array([result(traj)
+            C = ma.array([result(traj)
                           for traj in self.asWindows(windowSize)]).T
             C = C.mean(axis=1)
         tau = lags / self.frameRate
@@ -425,13 +422,13 @@ class WormTrajectory:
         lags = np.round(np.linspace(0, np.round(maxT*self.frameRate), 200)).astype(int)
         if windowSize is None:
             psi = self.getMaskedPosture(self.psi)
-            C = dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+            C = dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags)
         else:
             def result(traj):
                 psi = traj.getMaskedPosture(traj.psi)
-                return dotacf(ma.array([np.cos(psi),np.sin(psi)]).T, lags)
+                return dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags)
 
-            C = np.array([result(traj)
+            C = ma.array([result(traj)
                           for traj in self.asWindows(windowSize)]).T
             C = C.mean(axis=1)
         tau = lags / self.frameRate
@@ -465,7 +462,7 @@ class WormTrajectory:
         n = int(np.round(maxT*self.frameRate))
         tau = range(n)/self.frameRate
         psi = self.getMaskedPosture(self.psi)
-        C = circacf(psi, n)
+        C = dotacf(ma.array([ma.cos(psi), ma.sin(psi)]), n)
         return tau, C
 
     def plotBearingAutocorrelation(self, maxT=100, color='k', showPlot=True):

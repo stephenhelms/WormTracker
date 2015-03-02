@@ -11,6 +11,7 @@ import scipy.optimize as opt
 import scipy.integrate as scint
 import scipy.sparse.linalg as SLA
 import statsmodels.api as sm
+import lmfit
 from tsstats import *
 import sde
 import stochprocess
@@ -32,11 +33,10 @@ class TrajectoryModel(object):
         pass
 
     def simulate(self, storeFile, location, nTimes=10):
-        self._prepareSimulation(storeFile, h5loc, nTimes)
+        self._prepareSimulation(storeFile, location, nTimes)
         print 'Running simulations...'
         for i in xrange(nTimes):
             print '{0} of {1}'.format(i, nTimes)
-            location = location
             self._doSimulation(storeFile, location, i)
 
     @abstractmethod
@@ -58,9 +58,8 @@ class TrajectoryModel(object):
 
 
 class Helms2014CentroidModel(TrajectoryModel):
-    Helms2014_mean_traits = np.array([1.00, 0.31, -1.41, -1.34, 1.93, 0.06, 2.78])
-    Helms2014_std_traits = np.array([0.54, 0.41, 0.18, 0.23, 0.26, 0.39, 0.36])
-    Helms2014_mode1 = np.array([0.43, 0.42, 0.42, 0.40, 0.45, 0.31, 0.01])
+    Helms2014_mean_traits = np.array([1.9327, 0.0642, 2.7815, -1.4129, -1.3353, 1.0023, 0.3089])
+    Helms2014_mode1 = np.array([0.2729, 0.2871, -0.0554, 0.1470, 0.1754, 0.7188, 0.5206])
 
     def __init__(self):
         # reversals
@@ -76,6 +75,8 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.tau_s = None
         self.D_s = None
 
+        self.length = 1
+
         # simulation settings
         self.duration = 30.*60.
         self.dt = 1./11.5
@@ -84,30 +85,45 @@ class Helms2014CentroidModel(TrajectoryModel):
         self.fitReversals(trajectory, windowSize, plotFit)
         self.fitBearing(trajectory, windowSize, plotFit)
         self.fitSpeed(trajectory, windowSize, plotFit)
+        self.length = trajectory.length
 
     def fitReversals(self, trajectory, windowSize=None, plotFit=False):
         lags = np.arange(0, np.round(10.*trajectory.frameRate))
         if windowSize is None:
             dpsi = trajectory.getMaskedPosture(trajectory.dpsi)
-            vdpsi = ma.array([np.cos(dpsi), np.sin(dpsi)]).T
+            vdpsi = ma.array([ma.cos(dpsi), ma.sin(dpsi)]).T
             C = dotacf(vdpsi, lags)
         else:
             def getVectorDpsi(traj):
                 dpsi = traj.getMaskedPosture(traj.dpsi)
-                vdpsi = ma.array([np.cos(dpsi), np.sin(dpsi)]).T
-                return vdpsi
+                if float(len(dpsi.compressed()))/float(len(dpsi)) > 0.2:
+                    vdpsi = ma.array([ma.cos(dpsi), ma.sin(dpsi)]).T
+                    return vdpsi
+                else:
+                    return ma.zeros((len(dpsi), 2))*ma.masked
 
-            C = np.array([dotacf(getVectorDpsi(traj), lags)
+            C = ma.array([dotacf(getVectorDpsi(traj), lags)
                           for traj in trajectory.asWindows(windowSize)]).T
             C = C.mean(axis=1)
         tau = lags / trajectory.frameRate
-        p, pcov = opt.curve_fit(self._reversalFitFunction, tau, C, [0, 0.5])
-        f_rev = 0.5 - np.sqrt(p[1]/4)
-        self.tau_rev = 10**p[0]/(1.-f_rev)
-        self.tau_fwd = 10**p[0]/f_rev
+
+        # do the bounded fit
+        params = lmfit.Parameters()
+        params.add('log_tau_eff', value=0.)
+        params.add('Cinf', value=0.5, min=0., max=1.)
+
+        if C.compressed().shape[0]>0:
+            p = lmfit.minimize(self._reversalFitResidual, params, args=(tau, C))
+
+            f_rev = 0.5 - np.sqrt(params['Cinf']/4)
+            self.tau_rev = 10**params['log_tau_eff']/(1.-f_rev)
+            self.tau_fwd = 10**params['log_tau_eff']/f_rev
+        else:
+            self.tau_rev = ma.masked
+            self.tau_fwd = ma.masked
         if plotFit:
             plt.plot(tau, C, 'k.')
-            plt.plot(tau, self._reversalFitFunction(tau, p[0], p[1]), 'r-')
+            plt.plot(tau, self._reversalFitFunction(tau, params['log_tau_eff'], params['Cinf']), 'r-')
             plt.xlabel(r'$\tau$ (s)')
             plt.ylabel(r'$\langle \vec{\Delta\psi}(0) \cdot \vec{\Delta\psi}(\tau) \rangle$')
             textstr = '$\\tau_{\mathrm{rev}}=%.2f$ s\n$\\tau_{\mathrm{fwd}}=%.2f$ s'%(self.tau_rev, self.tau_fwd)
@@ -117,6 +133,12 @@ class Helms2014CentroidModel(TrajectoryModel):
             ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=14,
                     horizontalalignment='right', verticalalignment='top', bbox=props)
             plt.show()
+
+    def _reversalFitResidual(self, vars, tau, data):
+        log_tau_eff = float(vars['log_tau_eff'])
+        Cinf = float(vars['Cinf'])
+        model = self._reversalFitFunction(tau, log_tau_eff, Cinf)
+        return (data-model)
 
     def _reversalFitFunction(self, tau, log_tau_eff, Cinf):
         return (1.-Cinf)*np.exp(-tau/10**log_tau_eff) + Cinf
@@ -135,23 +157,33 @@ class Helms2014CentroidModel(TrajectoryModel):
 
     def fitBearingDrift(self, trajectory, windowSize=None, plotFit=False):
         lags = np.linspace(0, np.round(50.*trajectory.frameRate), 200)
+        tau = lags / trajectory.frameRate
         if windowSize is None:
             psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
             D = drift(psi, lags)
+            p = np.polyfit(tau, D, 1)
+            self.k_psi = p[0]
         else:
             def result(traj):
-                psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
-                return drift(psi, lags)
+                psi = traj.getMaskedPosture(traj.psi)
+                if float(len(psi.compressed()))/float(len(psi)) > 0.2:
+                    psi = unwrapma(psi)
+                    return ma.array(drift(psi, lags))
+                else:
+                    return ma.zeros((len(lags),))*ma.masked
 
-            D = np.array([result(traj)
-                          for traj in trajectory.asWindows(windowSize)]).T
-            D = D.mean(axis=1)
-        tau = lags / trajectory.frameRate
-        p = np.polyfit(tau, D, 1)
-        self.k_psi = p[0]
+            D = ma.array([result(traj)
+                          for traj in trajectory.asWindows(windowSize)])
+            k = np.array([np.polyfit(tau, Di, 1)[0]
+                          for Di in D
+                          if Di.compressed().shape[0]>50])
+            self.k_psi = ma.abs(k).mean()
+            D = ma.abs(D).T.mean(axis=1)
+        
+        
         if plotFit:
             plt.plot(tau, D, 'k.')
-            plt.plot(tau, np.polyval(p, tau), 'r-')
+            plt.plot(tau, self.k_psi*tau, 'r-')
             plt.xlabel(r'$\tau$ (s)')
             plt.ylabel(r'$\langle \psi(\tau) - \psi(0) \rangle$ (rad)')
             textstr = '$k_\psi=%.2f$ rad/s'%(self.k_psi)
@@ -214,35 +246,38 @@ class Helms2014CentroidModel(TrajectoryModel):
         return _speedFitFunction(tau, np.log10(self.tau_s), np.log10(self.D_s))
 
     def toParameterVector(self):
-        return (np.array([self.tau_fwd,
-                         self.tau_rev,
+        return (np.array([self.mu_s,
+                         self.tau_s,
+                         self.D_s,
                          self.k_psi,
                          self.D_psi,
-                         self.mu_s,
-                         self.tau_s,
-                         self.D_s]),
-                [r'\tau_{fwd}', r'\tau_{rev}', r'k_\psi',
-                 r'D_\psi', r'\mu_s', r'\tau_s', r'D_s'],
-                ['s', 's', 'rad/s', r'rad^2/s', r'\micro m/s',
-                 's', r'(\micro m/s)^2 s^{-1}'])
+                         self.tau_fwd,
+                         self.tau_rev,
+                         self.length]),
+                [r'\mu_s', r'\tau_s', r'D_s', 
+                 r'k_\psi', r'D_\psi',
+                 r'\tau_{fwd}', r'\tau_{rev}', r'length'],
+                [r'\micro m/s', 's', r'(\micro m/s)^2 s^{-1}',
+                 'rad/s', r'rad^2/s',
+                 's', 's', 'um'])
 
     def fromParameterVector(self, vector):
-        # reversals
-        self.tau_fwd = vector[0]
-        self.tau_rev = vector[1]
+        # speed
+        self.mu_s = vector[0]
+        self.tau_s = vector[1]
+        self.D_s = vector[2]
 
         # bearing
-        self.k_psi = vector[2]
-        self.D_psi = vector[3]
+        self.k_psi = vector[3]
+        self.D_psi = vector[4]
 
-        # speed
-        self.mu_s = vector[4]
-        self.tau_s = vector[5]
-        self.D_s = vector[6]
+        # reversals
+        self.tau_fwd = vector[5]
+        self.tau_rev = vector[6]
 
     def parametersToMode(self):
         p, labels, units = self.toParameterVector()
-        norm = (np.log10(np.abs(p))-self.Helms2014_mean_traits)/self.Helms2014_std_traits
+        norm = (np.log10(np.abs(p))-self.Helms2014_mean_traits)
         return np.dot(norm, self.Helms2014_mode1)
 
     def _prepareSimulation(self, storeFile, location, nTimes):
@@ -279,19 +314,21 @@ class Helms2014CentroidModel(TrajectoryModel):
             psi = self._simulateBodyBearing()
             g['psi'][i, :] = psi
             r = self._simulateReversals()
-            dpsi = np.zeros((n,))
-            dpsi[r == 1] = np.pi
+            dpsi = np.zeros((r.shape[0],))
+            dpsi[~r] = np.pi
             g['dpsi'][i, :] = dpsi
             phi = psi + dpsi
             g['phi'][i, :] = phi
 
-            v = s*np.array([np.cos(phi), np.sin(phi)])
+            v = (s*np.array([np.cos(phi), np.sin(phi)])).T
             g['v'][i, ...] = v
-            X = scint.cumtrapz(v, dx=self.dt)
+            X = np.zeros((r.shape[0], 2))
+            X[1:,:] = scint.cumtrapz(v, dx=self.dt, axis=0)
             g['X'][i, ...] = X
 
     def _simulateSpeed(self):
-        ou = sde.OrnsteinUhlenbeck(self.tau_s, self.mu_s, np.sqrt(2.*self.D_s))
+        ou = sde.OrnsteinUhlenbeck(self.tau_s, self.mu_s, np.sqrt(2.*self.D_s),
+                                   positive=True)
         return ou.integrateEuler(0., self.duration, self.dt, self.mu_s)[1]
 
     def _simulateBodyBearing(self):
