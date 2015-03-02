@@ -164,7 +164,7 @@ class AnimatedWormPhaseSpaceWithImage:
 
     def initialView(self):
         self.axPhase = plt.subplot(1, 2, 2)
-        self.phaseTraj, = self.axPhase.plot([], [], '.', color=(0.5,0.5,0.5))
+        self.phaseTraj, = self.axPhase.plot([], [], '-', color=(0.5,0.5,0.5))
         self.phasePoint, = self.axPhase.plot([], [], 'ro')
         plt.xlim((-10, 10))
         plt.xlabel('$a_'+str(self.v1)+'$')
@@ -187,7 +187,7 @@ class AnimatedWormPhaseSpaceWithImage:
         self.centroid, = self.axWorm.plot([], [], 'ro')
         plt.xticks([])
         plt.yticks([])
-        #self.
+        plt.tight_layout()
 
     def plot(self, frameNumber):
         # phase plot
@@ -206,21 +206,24 @@ class AnimatedWormPhaseSpaceWithImage:
                                                   :2]
         skel = self.trajectory.h5ref['skeleton'][frameNumber, :, :]
         empty = np.all(skel == 0, axis=1)
-        if np.any(self.posture.mask[frameNumber, :]):
-            if ~self.showBadWormImages:
-                self.skelLine.set_xdata(skel[~empty, 1])
-                self.skelLine.set_ydata(skel[~empty, 0])
-            else:
-                self.skelLine.set_xdata([])
-                self.skelLine.set_ydata([])
-        self.postureSkel.set_offsets(np.fliplr(self.skeleton[frameNumber, :, :]))
-        self.postureSkel.set_array(self.posture[frameNumber, :])
-        self.postureSkel.set_clim(-1, 1)
-        self.postureSkel.set_cmap(plt.get_cmap('PuOr'))
-        xc = self.X[frameNumber, 1]*self.pixelsPerMicron - bb[1]
-        self.centroid.set_xdata(xc)
-        yc = self.X[frameNumber, 0]*self.pixelsPerMicron - bb[0]
-        self.centroid.set_ydata(yc)
+        if ~self.showBadWormImages and np.any(self.posture.mask[frameNumber, :]):
+            self.skelLine.set_xdata(np.array([]))
+            self.skelLine.set_ydata(np.array([]))
+            self.postureSkel.set_offsets(np.array([[]]))
+            self.postureSkel.set_array(np.array([]))
+            self.centroid.set_xdata([])
+            self.centroid.set_ydata([])
+        else:
+            self.skelLine.set_xdata(skel[~empty, 1])
+            self.skelLine.set_ydata(skel[~empty, 0])
+            self.postureSkel.set_offsets(np.fliplr(self.skeleton[frameNumber, :, :]))
+            self.postureSkel.set_array(self.posture[frameNumber, :])
+            self.postureSkel.set_clim(-1, 1)
+            self.postureSkel.set_cmap(plt.get_cmap('PuOr'))
+            xc = self.X[frameNumber, 1]*self.pixelsPerMicron - bb[1]
+            self.centroid.set_xdata(xc)
+            yc = self.X[frameNumber, 0]*self.pixelsPerMicron - bb[0]
+            self.centroid.set_ydata(yc)
         plt.title('%i: %.2f s'%(frameNumber,frameNumber/self.frameRate))
 
     def getWormImage(self, frameNumber):
@@ -248,10 +251,10 @@ class AnimatedWormPhaseSpaceWithImage:
             frames = xrange(good[0], good[-1])
         if interval is None:
             interval = 1000./self.frameRate
-        return animation.FuncAnimation(figure, self.plot,
+        return animation.FuncAnimation(figure, self.plot, blit=True,
                                        frames=frames,
-                                       init_func=self.initialView,
-                                       interval=interval)
+                                       init_func=self.initialView)#,
+                                       #interval=interval)
 
     def showAnimation(self, frames=None, interval=None):
         self.getAnimation(frames=frames, interval=interval)
