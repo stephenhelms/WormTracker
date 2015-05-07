@@ -301,8 +301,8 @@ class WormTrajectoryPostProcessor:
                 else:
                     self.v[i,:] = ma.masked
 
-        self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
-        self.phi = np.arctan2(self.v[:, 1], self.v[:, 0])
+        self.s = ma.sqrt(ma.sum(ma.power(self.v, 2), axis=1))
+        self.phi = ma.arctan2(self.v[:, 1], self.v[:, 0])
         self.t[self.badFrames] = ma.masked
         self.X[self.badFrames, :] = ma.masked
         self.v[self.badFrames, :] = ma.masked
@@ -310,7 +310,7 @@ class WormTrajectoryPostProcessor:
         self.phi[self.badFrames] = ma.masked
 
     def calculatePosturalMeasurements(self):
-        self.Xhead = ma.array(np.squeeze(self.skeleton[:, 0, :]))
+        self.Xhead = ma.array(ma.squeeze(self.skeleton[:, 0, :]))
         self.Xhead = ((self.Xhead + self.h5ref['boundingBox'][:, :2]) /
                       self.pixelsPerMicron)
         self.Xhead[np.logical_not(self.orientationFixed), :] = ma.masked
@@ -318,10 +318,10 @@ class WormTrajectoryPostProcessor:
         self.Xtail = ((self.Xtail + self.h5ref['boundingBox'][:, :2]) /
                       self.pixelsPerMicron)
         self.Xtail[np.logical_not(self.orientationFixed), :] = ma.masked
-        self.psi = np.arctan2(self.Xhead[:, 0]-self.X[:, 0],
+        self.psi = ma.arctan2(self.Xhead[:, 0]-self.X[:, 0],
                               self.Xhead[:, 1]-self.X[:, 1])
         dpsi = self.phi - self.psi
-        self.dpsi = np.mod(dpsi+np.pi, 2*np.pi)-np.pi
+        self.dpsi = ma.mod(dpsi+np.pi, 2*np.pi)-np.pi
         self.psi[np.logical_not(self.orientationFixed)] = ma.masked
         self.dpsi[np.logical_or(np.logical_not(self.orientationFixed),
                                 self.badFrames)] = ma.masked
