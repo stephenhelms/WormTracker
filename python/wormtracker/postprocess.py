@@ -18,7 +18,7 @@ class WormTrajectoryPostProcessor:
     # segment settings
     max_n_missing = 10
     max_d_um = 10.
-    max_segment_frames = 500
+    max_segment_frames = 10000
     min_segment_size = 150
 
     # head assignment settings (centoid only method)
@@ -353,7 +353,7 @@ class WormTrajectoryPostProcessor:
                                           chunks=True,
                                           dtype='int')
         if len(self.segments) > self.h5ref['segments'].shape[0]:
-            self.h5ref['segments'].resize((len(self.segments, 2)))
+            self.h5ref['segments'].resize((len(self.segments), 2))
         self.h5ref['segments'][:len(self.segments), :] = \
             np.array(self.segments)
         self.h5ref['segments'][len(self.segments):, :] = -1
@@ -365,7 +365,7 @@ class WormTrajectoryPostProcessor:
                                           chunks=True,
                                           dtype='int')
         if len(self.segments) > self.h5ref['segmentAssignMethod'].shape[0]:
-            self.h5ref['segmentAssignMethod'].resize((len(self.segments,)))
+            self.h5ref['segmentAssignMethod'].resize((len(self.segments),))
         self.h5ref['segmentAssignMethod'][:len(self.segments)] = \
             self.segmentAssignMethod
         self.h5ref['segmentAssignMethod'][len(self.segments):] = 0
@@ -449,14 +449,14 @@ class WormTrajectoryPostProcessor:
                                       maxshape=(100,),
                                       dtype='f8')
         if self.ltheta is not None:
-            self.h5ref['ltheta'][...] = self.ltheta
+            self.h5ref['ltheta'][...] = self.ltheta.real
         if 'vtheta' not in self.h5ref:
             self.h5ref.create_dataset('vtheta',
                                       (self.nAngles, self.nAngles),
                                       maxshape=(100, 100),
                                       dtype='f8')
         if self.vtheta is not None:
-            self.h5ref['vtheta'][...] = self.vtheta
+            self.h5ref['vtheta'][...] = self.vtheta.real
 
 
 def _getMotionVariables(X, dt):
