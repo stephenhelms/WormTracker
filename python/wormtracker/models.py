@@ -92,7 +92,7 @@ class Helms2014CentroidModel(TrajectoryModel):
         if windowSize is None:
             dpsi = trajectory.getMaskedPosture(trajectory.dpsi)
             vdpsi = ma.array([ma.cos(dpsi), ma.sin(dpsi)]).T
-            C = dotacf(vdpsi, lags)
+            C = dotacf(vdpsi, lags, trajectory.excluded)
         else:
             def getVectorDpsi(traj):
                 dpsi = traj.getMaskedPosture(traj.dpsi)
@@ -102,7 +102,7 @@ class Helms2014CentroidModel(TrajectoryModel):
                 else:
                     return ma.zeros((len(dpsi), 2))*ma.masked
 
-            C = ma.array([dotacf(getVectorDpsi(traj), lags)
+            C = ma.array([dotacf(getVectorDpsi(traj), lags, traj.excluded)
                           for traj in trajectory.asWindows(windowSize)]).T
             C = C.mean(axis=1)
         tau = lags / trajectory.frameRate
@@ -160,7 +160,7 @@ class Helms2014CentroidModel(TrajectoryModel):
         tau = lags / trajectory.frameRate
         if windowSize is None:
             psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
-            D = drift(psi, lags)
+            D = drift(psi, lags, trajectory.excluded)
             p = np.polyfit(tau, D, 1)
             self.k_psi = p[0]
         else:
@@ -168,7 +168,7 @@ class Helms2014CentroidModel(TrajectoryModel):
                 psi = traj.getMaskedPosture(traj.psi)
                 if float(len(psi.compressed()))/float(len(psi)) > 0.2:
                     psi = unwrapma(psi)
-                    return ma.array(drift(psi, lags))
+                    return ma.array(drift(psi, lags, traj.excluded))
                 else:
                     return ma.zeros((len(lags),))*ma.masked
 
