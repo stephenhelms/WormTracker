@@ -392,15 +392,16 @@ class WormTrajectory:
     def getSpeedAutocorrelation(self, maxT=10., windowSize=100.):
         lags = np.arange(0, np.round(maxT*self.frameRate))
         if windowSize is None:
+            self.identifyReversals()
             s = self.getMaskedCentroid(self.s)
             s[self.nearRev] = ma.masked
-            C = s.var()*acf(s, lags)
+            C = s.var()*acf(s, lags, self.excluded)
         else:
             def result(traj):
                 traj.identifyReversals()
                 s = traj.getMaskedCentroid(traj.s)
                 s[traj.nearRev] = ma.masked
-                return s.var()*acf(s, lags)
+                return s.var()*acf(s, lags, traj.excluded)
 
             C = ma.array([result(traj)
                           for traj in self.asWindows(windowSize)]).T
@@ -422,11 +423,11 @@ class WormTrajectory:
         lags = np.round(np.linspace(0, np.round(maxT*self.frameRate), 200)).astype(int)
         if windowSize is None:
             psi = self.getMaskedPosture(self.psi)
-            C = dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags)
+            C = dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags, self.excluded)
         else:
             def result(traj):
                 psi = traj.getMaskedPosture(traj.psi)
-                return dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags)
+                return dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags, traj.excluded)
 
             C = ma.array([result(traj)
                           for traj in self.asWindows(windowSize)]).T
@@ -447,7 +448,7 @@ class WormTrajectory:
         n = int(np.round(maxT*self.frameRate))
         tau = range(n)/self.frameRate
         dpsi = self.getMaskedPosture(self.dpsi)
-        C = acf(np.cos(dpsi), n)
+        C = acf(np.cos(dpsi), n, self.excluded)
         return tau, C
 
     def plotReversalStateAutocorrelation(self, maxT=100, color='k', showPlot=True):

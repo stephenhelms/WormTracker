@@ -301,8 +301,8 @@ class WormTrajectoryPostProcessor:
                 else:
                     self.v[i,:] = ma.masked
 
-        self.s = np.sqrt(np.sum(np.power(self.v, 2), axis=1))
-        self.phi = np.arctan2(self.v[:, 1], self.v[:, 0])
+        self.s = ma.sqrt(ma.sum(ma.power(self.v, 2), axis=1))
+        self.phi = ma.arctan2(self.v[:, 1], self.v[:, 0])
         self.t[self.badFrames] = ma.masked
         self.X[self.badFrames, :] = ma.masked
         self.v[self.badFrames, :] = ma.masked
@@ -310,7 +310,7 @@ class WormTrajectoryPostProcessor:
         self.phi[self.badFrames] = ma.masked
 
     def calculatePosturalMeasurements(self):
-        self.Xhead = ma.array(np.squeeze(self.skeleton[:, 0, :]))
+        self.Xhead = ma.array(ma.squeeze(self.skeleton[:, 0, :]))
         self.Xhead = ((self.Xhead + self.h5ref['boundingBox'][:, :2]) /
                       self.pixelsPerMicron)
         self.Xhead[np.logical_not(self.orientationFixed), :] = ma.masked
@@ -318,10 +318,10 @@ class WormTrajectoryPostProcessor:
         self.Xtail = ((self.Xtail + self.h5ref['boundingBox'][:, :2]) /
                       self.pixelsPerMicron)
         self.Xtail[np.logical_not(self.orientationFixed), :] = ma.masked
-        self.psi = np.arctan2(self.Xhead[:, 0]-self.X[:, 0],
+        self.psi = ma.arctan2(self.Xhead[:, 0]-self.X[:, 0],
                               self.Xhead[:, 1]-self.X[:, 1])
         dpsi = self.phi - self.psi
-        self.dpsi = np.mod(dpsi+np.pi, 2*np.pi)-np.pi
+        self.dpsi = ma.mod(dpsi+np.pi, 2*np.pi)-np.pi
         self.psi[np.logical_not(self.orientationFixed)] = ma.masked
         self.dpsi[np.logical_or(np.logical_not(self.orientationFixed),
                                 self.badFrames)] = ma.masked
@@ -353,7 +353,7 @@ class WormTrajectoryPostProcessor:
                                           chunks=True,
                                           dtype='int')
         if len(self.segments) > self.h5ref['segments'].shape[0]:
-            self.h5ref['segments'].resize((len(self.segments, 2)))
+            self.h5ref['segments'].resize((len(self.segments), 2))
         self.h5ref['segments'][:len(self.segments), :] = \
             np.array(self.segments)
         self.h5ref['segments'][len(self.segments):, :] = -1
@@ -365,7 +365,7 @@ class WormTrajectoryPostProcessor:
                                           chunks=True,
                                           dtype='int')
         if len(self.segments) > self.h5ref['segmentAssignMethod'].shape[0]:
-            self.h5ref['segmentAssignMethod'].resize((len(self.segments,)))
+            self.h5ref['segmentAssignMethod'].resize((len(self.segments),))
         self.h5ref['segmentAssignMethod'][:len(self.segments)] = \
             self.segmentAssignMethod
         self.h5ref['segmentAssignMethod'][len(self.segments):] = 0
@@ -449,14 +449,14 @@ class WormTrajectoryPostProcessor:
                                       maxshape=(100,),
                                       dtype='f8')
         if self.ltheta is not None:
-            self.h5ref['ltheta'][...] = np.real(self.ltheta)
+            self.h5ref['ltheta'][...] = self.ltheta.real
         if 'vtheta' not in self.h5ref:
             self.h5ref.create_dataset('vtheta',
                                       (self.nAngles, self.nAngles),
                                       maxshape=(100, 100),
                                       dtype='f8')
         if self.vtheta is not None:
-            self.h5ref['vtheta'][...] = np.real(self.vtheta)
+            self.h5ref['vtheta'][...] = self.vtheta.real
 
 
 def _getMotionVariables(X, dt):
