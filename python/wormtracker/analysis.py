@@ -55,9 +55,7 @@ def meanSquaredDisplacement(X, lags=500, exclude=None):
         x1[reject, :] = ma.masked
         displacements = x0 - x1
         d2 = (displacements**2).sum(axis=1).compressed()
-        ld2 = np.log10(d2)
-        ld2[np.isinf(ld2)] = ma.masked
-        Sigma[i] = np.mean(ld2)
+        Sigma[i] = d2.mean()
     return Sigma
 
 
@@ -487,14 +485,16 @@ class WormTrajectory:
     def plotMeanSquaredDisplacement(self, tau=None, Dworm=100., showPlot=True,
                                     showRef=True):
         tau, Sigma = self.getMeanSquaredDisplacement(tau)
-        plt.plot(np.log10(tau), Sigma, 'k.')
+        plt.plot(tau, Sigma, 'k.')
         if showRef:
             s = self.getMaskedCentroid(self.s)
-            plt.plot(np.log10(tau), np.log10((s.mean()**2)*(tau**2)), 'r-')
+            plt.plot(tau, (s.mean()**2)*(tau**2), 'r-')
             alpha = 4.*Dworm
-            plt.plot(np.log10(tau), np.log10(alpha*tau), 'r:')
-        plt.xlabel(r'log $\tau$ \ (s)')
-        plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+            plt.plot(tau, alpha*tau, 'r:')
+        plt.xlabel(r'$\tau$ \ (s)')
+        plt.ylabel(r'$\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+        plt.gca().set_xscale('log')
+        plt.gca().set_yscale('log')
         if showPlot:
             plt.show()
 
@@ -857,13 +857,14 @@ class WormTrajectoryEnsemble:
             color = self.color
         tau = np.logspace(-1,3,200)
         S, Sl, Su = self.ensembleAverage(lambda x: x.getMeanSquaredDisplacement(tau)[1])
-        log_tau = np.log10(tau)
-        plt.plot(log_tau, S, '.-', color=color, label=self.name)
+        plt.plot(tau, S, '.-', color=color, label=self.name)
         plt.hold(True)
-        plt.fill_between(log_tau, Sl, Su, facecolor=color, alpha=0.3)
-        plt.xlabel(r'log $\tau$ \ (s)')
-        plt.ylabel(r'log $\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
-        plt.xlim((np.min(np.log10(tau)), np.max(np.log10(tau))))
+        plt.fill_between(tau, Sl, Su, facecolor=color, alpha=0.3)
+        plt.xlabel(r'$\tau$ \ (s)')
+        plt.ylabel(r'$\langle \| x(t) - x(t-\tau) \|^2 \rangle$ (um^2)')
+        plt.xlim((np.min(tau), np.max(tau)))
+        plt.gca().set_xscale('log')
+        plt.gca().set_yscale('log')
         plt.grid(True)
         if showPlot:
             plt.show()
