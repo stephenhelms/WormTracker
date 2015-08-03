@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.ma as ma
 from numpy import linalg as LA
+import tsstats
 #from numba import jit
 from wormtracker import Logger
 
@@ -16,7 +17,7 @@ class WormTrajectoryPostProcessor:
     maxSpeed = 1000
 
     # segment settings
-    max_n_missing = 10
+    max_n_missing = 3
     max_d_um = 10.
     max_segment_frames = 10000
     min_segment_size = 150
@@ -29,6 +30,10 @@ class WormTrajectoryPostProcessor:
 
     # head assignment settings (posture method)
     headVarianceMinRatio = 1.1  # Min ratio of head to tail posture variation
+
+    # head assignment settings (posture dynamics method)
+    headDeltaCorrelation = 0.05
+    bodyWaveDelay = 0.08
 
     # smoothing
     useSmoothingFilterDerivatives = True
@@ -113,8 +118,8 @@ class WormTrajectoryPostProcessor:
         # import skeleton splines
         self.skeleton = self.h5ref['skeletonSpline'][...]
         self.posture = self.h5ref['posture'][...]
-        self.haveSkeleton = [np.any(skeleton > 0)
-                             for skeleton in self.skeleton]
+        self.haveSkeleton = np.array([np.any(skeleton > 0)
+                                      for skeleton in self.skeleton])
 
     # @jit
     @staticmethod 
@@ -153,7 +158,7 @@ class WormTrajectoryPostProcessor:
         self.interframe_d = interframe_d
 
         # flip data appropriately
-        sel = self.haveSkeleton and flipped
+        sel = flipped
         self.skeleton[sel, :, :] = self.skeleton[sel, ::-1, :]
         self.posture[sel, :] = self.posture[sel, ::-1]
 
@@ -189,7 +194,50 @@ class WormTrajectoryPostProcessor:
                          if segment[1] - segment[0] >
                          self.min_segment_size]
 
+
     def assignHeadTail(self):
+        flipSegment = np.zeros((len(self.segments),), dtype='bool')
+        segmentAssignMethod = -np.ones((len(self.segments),), dtype='int8')
+        npoints = round(self.posture.shape[1]*0.1)
+        A = ma.array(self.posture)
+        A[self.badFrames] = ma.masked
+        A[~self.haveSkeleton] = ma.masked
+        for i, segment in enumerate(self.segments):
+            b = segment[0]
+            e = segment[1]
+            # calculate dynamics measures
+            hm = _headMoveMeasure(A[b:e,:])
+            bw = _bodyWaveMeasure(A[b:e,:])
+            # head has oscillatory head movement unlike tail (negative delta correlation measure)
+            # body wave delay is positive
+            if np.abs(bw) > self.bodyWaveDelay:
+                segmentAssignMethod[i] = 3
+                if bw < -self.bodyWaveDelay:
+                    flipSegment[i] = True
+            elif np.abs(hm) > self.headDeltaCorrelation:
+                segmentAssignMethod[i] = 2
+                if hm < -self.headDeltaCorrelation:
+                    flipSegment[i] = True
+            else:
+                # posture variance method
+                v = A.std(axis=0)
+                npoints=5
+                vh = v[:npoints].sum()
+                vt = v[-npoints:].sum()
+                # head has higher variance
+                if vh/vt > self.headVarianceMinRatio:
+                    # not flipped
+                    segmentAssignMethod[i] = 1
+                elif vt/vh > self.headVarianceMinRatio:
+                    # flipped
+                    flipSegment[i] = True
+                    segmentAssignMethod[i] = 1
+                else:
+                    segmentAssignMethod[i] = 0  # can't assign
+        self.flipSegment = flipSegment
+        self.segmentAssignMethod = segmentAssignMethod
+
+    def assignHeadTailPostureVariance(self):
         flipSegment = np.zeros((len(self.segments),), dtype='bool')
         segmentAssignMethod = -np.ones((len(self.segments),), dtype='int8')
         npoints = round(self.posture.shape[1]*0.1)
@@ -467,3 +515,21 @@ def _getMotionVariables(X, dt):
     s = np.sqrt(np.sum(np.power(v, 2), axis=1))
     phi = np.arctan2(v[:, 1], v[:, 0])
     return (v, s, phi)
+
+
+def _headMoveMeasure(A):
+    lags = np.arange(0,24)
+    i0 = 3
+    C = tsstats.acf(A[:,i0], lags)
+    Cm = C.min()
+    Ct = tsstats.acf(A[:,-i0], lags)
+    Cmt = Ct.min()
+    return -(Cm-Cmt)
+
+
+def _bodyWaveMeasure(A):
+    lags = np.arange(-12,12)
+    i0 = 20
+    i1 = 30
+    C = tsstats.ccf(A[:,i0], A[:,i1], lags)
+    return lags[(C==C.max()).nonzero()]/11.5
