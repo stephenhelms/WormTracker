@@ -57,9 +57,9 @@ class TrajectoryModel(object):
                     for i in xrange(len(vector))})
 
 
-class Helms2014CentroidModel(TrajectoryModel):
-    Helms2014_mean_traits = np.array([1.9327, 0.0642, 2.7815, -1.4129, -1.3353, 1.0023, 0.3089])
-    Helms2014_mode1 = np.array([0.2729, 0.2871, -0.0554, 0.1470, 0.1754, 0.7188, 0.5206])
+class Helms2015CentroidModel(TrajectoryModel):
+    Helms2015_mean_traits = np.array([1.9327, 0.0642, 2.7815, -1.4129, -1.3353, 1.0023, 0.3089])
+    Helms2015_mode1 = np.array([0.2729, 0.2871, -0.0554, 0.1470, 0.1754, 0.7188, 0.5206])
 
     def __init__(self):
         # reversals
@@ -125,7 +125,7 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.plot(tau, C, 'k.')
             plt.plot(tau, self._reversalFitFunction(tau, params['log_tau_eff'], params['Cinf']), 'r-')
             plt.xlabel(r'$\tau$ (s)')
-            plt.ylabel(r'$\langle \vec{\Delta\psi}(0) \cdot \vec{\Delta\psi}(\tau) \rangle$')
+            plt.ylabel(r'$\langle \cos\left(\Delta\psi(\tau) - \Delta\psi(0)\right) \rangle$')
             textstr = '$\\tau_{\mathrm{rev}}=%.2f$ s\n$\\tau_{\mathrm{fwd}}=%.2f$ s'%(self.tau_rev, self.tau_fwd)
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             # place a text box in lower left in axes coords
@@ -161,22 +161,25 @@ class Helms2014CentroidModel(TrajectoryModel):
         if windowSize is None:
             psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
             D = drift(psi, lags, trajectory.excluded)
-            p = np.polyfit(tau, D, 1)
+            sel = ~ma.getmaskarray(psi)
+            #p = np.polyfit(tau, D, 1)
+            p = np.polyfit(trajectory.t[sel], psi[sel], 1)
             self.k_psi = p[0]
         else:
             def result(traj):
                 psi = traj.getMaskedPosture(traj.psi)
                 if float(len(psi.compressed()))/float(len(psi)) > 0.2:
                     psi = unwrapma(psi)
-                    return ma.array(drift(psi, lags, traj.excluded))
+                    D = drift(psi, lags, traj.excluded)
+                    sel = ~ma.getmaskarray(psi)
+                    p = np.polyfit(traj.t[sel], psi[sel], 1)
+                    return D, p[0]
                 else:
-                    return ma.zeros((len(lags),))*ma.masked
+                    return ma.zeros((len(lags),))*ma.masked, ma.masked
 
-            D = ma.array([result(traj)
-                          for traj in trajectory.asWindows(windowSize)])
-            k = np.array([np.polyfit(tau, Di, 1)[0]
-                          for Di in D
-                          if Di.compressed().shape[0]>50])
+            results = [result(traj) for traj in trajectory.asWindows(windowSize)]
+            D = ma.array([resulti[0] for resulti in results])
+            k = ma.array([resulti[1] for resulti in results])
             self.k_psi = ma.abs(k).mean()
             D = ma.abs(D).T.mean(axis=1)
         
@@ -185,8 +188,8 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.plot(tau, D, 'k.')
             plt.plot(tau, self.k_psi*tau, 'r-')
             plt.xlabel(r'$\tau$ (s)')
-            plt.ylabel(r'$\langle \psi(\tau) - \psi(0) \rangle$ (rad)')
-            textstr = '$k_\psi=%.2f$ rad/s'%(self.k_psi)
+            plt.ylabel(r'$\langle |\psi(\tau) - \psi(0)| \rangle$ (rad)')
+            textstr = r'$\langle|k_\psi|\rangle=%.2f$ rad/s'%(self.k_psi)
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             # place a text box in lower left in axes coords
             ax = plt.gca()
@@ -195,15 +198,35 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.show()
 
     def fitBearingDiffusion(self, trajectory, windowSize=None, plotFit=False):
-        tau, C = trajectory.getBodyBearingAutocorrelation(maxT=50.,
-                                                          windowSize=windowSize)
+        lags = np.round(np.linspace(0, np.round(100.*trajectory.frameRate), 200)).astype(int)
+        tau = lags/trajectory.frameRate
+        if windowSize is None:
+            psi = unwrapma(trajectory.getMaskedPosture(trajectory.psi))
+            sel = ~ma.getmaskarray(psi)
+            p = np.polyfit(trajectory.t[sel], psi[sel], 1)
+            psi_corr = psi - np.polyval(p, xrange(psi.shape[0]))
+            C = dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags, trajectory.excluded)
+        else:
+            def result(traj):
+                psi = unwrapma(traj.getMaskedPosture(traj.psi))
+                if float(len(psi.compressed()))/float(len(psi)) > 0.2:
+                    sel = ~ma.getmaskarray(psi)
+                    p = np.polyfit(traj.t[sel], psi[sel], 1)
+                    psi_corr = psi - np.polyval(p, xrange(psi.shape[0]))
+                    return dotacf(ma.array([ma.cos(psi),ma.sin(psi)]).T, lags, traj.excluded)
+                else:
+                    return ma.zeros((len(lags),))*ma.masked
+
+            C = ma.array([result(traj)
+                          for traj in trajectory.asWindows(windowSize)]).T
+            C = C.mean(axis=1)
         p, pcov = opt.curve_fit(self._bearingDiffusionFitFunction, tau, C, [-1.])
         self.D_psi = 10**p[0]
         if plotFit:
             plt.plot(tau, C, 'k.')
             plt.plot(tau, self._bearingDiffusionFitFunction(tau, p[0]), 'r-')
             plt.xlabel(r'$\tau$ (s)')
-            plt.ylabel(r'$\langle \vec{\psi}(0) \cdot \vec{\psi}(\tau) \rangle$')
+            plt.ylabel(r'$\langle \cos \left( \psi(\tau) - \psi(0)\right) \rangle$')
             textstr = '$D_\psi=%.2f \mathrm{rad}^2/\mathrm{s}$'%(self.D_psi)
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             # place a text box in lower left in axes coords
@@ -230,7 +253,7 @@ class Helms2014CentroidModel(TrajectoryModel):
             plt.plot(tau, C, 'k.')
             plt.plot(tau, self._speedFitFunction(tau, p[0], p[1]), 'r-')
             plt.xlabel(r'$\tau$ (s)')
-            plt.ylabel(r'$\langle \hat{s}(0) \cdot \hat{s}(\tau) \rangle \mathrm{(um/s)}^2$')
+            plt.ylabel(r'$\langle \Delta s(0) \cdot \Delta s(\tau) \rangle \mathrm{(um/s)}^2$')
             textstr = '$\\tau_s=%.2f \mathrm{s}$\n$D_s=%.2f \mathrm{(um/s)}^2/\mathrm{s}$'%(self.tau_s, self.D_s)
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             # place a text box in lower left in axes coords
@@ -277,8 +300,8 @@ class Helms2014CentroidModel(TrajectoryModel):
 
     def parametersToMode(self):
         p, labels, units = self.toParameterVector()
-        norm = (np.log10(np.abs(p))-self.Helms2014_mean_traits)
-        return np.dot(norm, self.Helms2014_mode1)
+        norm = (np.log10(np.abs(p))-self.Helms2015_mean_traits)
+        return np.dot(norm, self.Helms2015_mode1)
 
     def _prepareSimulation(self, storeFile, location, nTimes):
         with h5py.File(storeFile) as f:
