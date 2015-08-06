@@ -115,7 +115,7 @@ class Helms2015CentroidModel(TrajectoryModel):
         if C.compressed().shape[0]>0:
             p = lmfit.minimize(self._reversalFitResidual, params, args=(tau, C))
 
-            f_rev = 0.5 - np.sqrt(params['Cinf']/4)
+            f_rev = 0.5 - np.sqrt(params['Cinf']/4.)
             self.tau_rev = 10**params['log_tau_eff']/(1.-f_rev)
             self.tau_fwd = 10**params['log_tau_eff']/f_rev
         else:
