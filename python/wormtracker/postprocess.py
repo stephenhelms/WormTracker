@@ -11,8 +11,8 @@ class WormTrajectoryPostProcessor:
     # bad frame settings
     filterByWidth = True
     filterByLength = True
-    widthThreshold = (0.5, 1.5)
-    lengthThreshold = (0.8, 1.2)
+    widthThreshold = (0.7, 1.3)
+    lengthThreshold = (0.9, 1.1)
     filterBySpeed = True
     maxSpeed = 1000
 
@@ -29,7 +29,7 @@ class WormTrajectoryPostProcessor:
     headMinRelBrightness = 0.2  # Min relative brightness for head
 
     # head assignment settings (posture method)
-    headVarianceMinRatio = 1.1  # Min ratio of head to tail posture variation
+    headVarianceMinRatio = 1.2  # Min ratio of head to tail posture variation
 
     # head assignment settings (posture dynamics method)
     headDeltaCorrelation = 0.05
@@ -118,8 +118,8 @@ class WormTrajectoryPostProcessor:
         # import skeleton splines
         self.skeleton = self.h5ref['skeletonSpline'][...]
         self.posture = self.h5ref['posture'][...]
-        self.haveSkeleton = np.array([np.any(skeleton > 0)
-                                      for skeleton in self.skeleton])
+        self.haveSkeleton = np.array([np.any(skeleton > 0) and ~badFrame
+                                      for skeleton, badFrame in zip(self.skeleton, self.badFrames)])
 
     # @jit
     @staticmethod 
@@ -205,12 +205,25 @@ class WormTrajectoryPostProcessor:
         for i, segment in enumerate(self.segments):
             b = segment[0]
             e = segment[1]
+            # posture variance method
+            v = A.std(axis=0)
+            npoints=5
+            vh = v[:npoints].sum()
+            vt = v[-npoints:].sum()
             # calculate dynamics measures
             hm = _headMoveMeasure(A[b:e,:])
             bw = _bodyWaveMeasure(A[b:e,:])
+            # head has more variance
             # head has oscillatory head movement unlike tail (negative delta correlation measure)
             # body wave delay is positive
-            if np.abs(bw) > self.bodyWaveDelay:
+            if vh/vt > self.headVarianceMinRatio:
+                # not flipped
+                segmentAssignMethod[i] = 1
+            elif vt/vh > self.headVarianceMinRatio:
+                # flipped
+                flipSegment[i] = True
+                segmentAssignMethod[i] = 1
+            elif np.abs(bw) > self.bodyWaveDelay:
                 segmentAssignMethod[i] = 3
                 if bw < -self.bodyWaveDelay:
                     flipSegment[i] = True
@@ -219,21 +232,7 @@ class WormTrajectoryPostProcessor:
                 if hm < -self.headDeltaCorrelation:
                     flipSegment[i] = True
             else:
-                # posture variance method
-                v = A.std(axis=0)
-                npoints=5
-                vh = v[:npoints].sum()
-                vt = v[-npoints:].sum()
-                # head has higher variance
-                if vh/vt > self.headVarianceMinRatio:
-                    # not flipped
-                    segmentAssignMethod[i] = 1
-                elif vt/vh > self.headVarianceMinRatio:
-                    # flipped
-                    flipSegment[i] = True
-                    segmentAssignMethod[i] = 1
-                else:
-                    segmentAssignMethod[i] = 0  # can't assign
+                segmentAssignMethod[i] = 0  # can't assign
         self.flipSegment = flipSegment
         self.segmentAssignMethod = segmentAssignMethod
 
@@ -532,4 +531,4 @@ def _bodyWaveMeasure(A):
     i0 = 20
     i1 = 30
     C = tsstats.ccf(A[:,i0], A[:,i1], lags)
-    return lags[(C==C.max()).nonzero()]/11.5
+    return lags[(C==C.max()).nonzero()][0]/11.5
