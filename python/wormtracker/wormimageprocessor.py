@@ -45,7 +45,7 @@ class WormImageProcessor:
     Performs image processing tasks needed to find a worm in an image.
     """
     def __init__(self, pixelSize=0.05, threshold=0.9, backgroundDiskRadius=5,
-                 wormDiskRadius=2):
+                 wormDiskRadius=2, useBlur=True):
         self.pixelSize = pixelSize
         self.threshold = threshold
         self.backgroundDiskRadius = backgroundDiskRadius
@@ -57,6 +57,7 @@ class WormImageProcessor:
         self.holeAreaThreshold = 10
         self.compactnessThreshold = 10
         self.wormAreaThresholdRange = [0.5, 1.5]
+        self.useBlur = useBlur
 
     def autoWormConfiguration(self, wormImage):
         self.wormDiskRadius = round(wormImage.width/2.0*self.pixelSize)
@@ -66,8 +67,10 @@ class WormImageProcessor:
         bgSE = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
                                          (self.backgroundDiskRadius+1,
                                           self.backgroundDiskRadius+1))
-        #blurred = cv2.blur(image, (self.wormDiskRadius, self.wormDiskRadius))
-        blurred = cv2.GaussianBlur(image, (self.wormDiskRadius, self.wormDiskRadius), 0.)
+        if self.useBlur:
+          blurred = cv2.GaussianBlur(image, (self.wormDiskRadius, self.wormDiskRadius), 0.)
+        else:
+          blurred = image
         return 255-cv2.morphologyEx(blurred, cv2.MORPH_BLACKHAT, bgSE)
 
     def applyThreshold(self, image):
