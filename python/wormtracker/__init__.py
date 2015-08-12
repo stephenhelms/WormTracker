@@ -601,8 +601,7 @@ class WormImage:
         if moments['m00'] != 0:  # only calculate if there is a non-zero area
             cx = float(moments['m10'])/float(moments['m00'])  # cx = M10/M00
             cy = float(moments['m01'])/float(moments['m00'])
-            self.centroid = self.toRegionCoordinates( \
-                np.flipud(self.toCroppedCoordinates([cx, cy])))
+            self.centroid = np.array([cx, cy])
         else:
             self.centroid = None
 
