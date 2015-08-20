@@ -1,0 +1,50 @@
+#PBS -S /bin/bash 
+#PBS -lwalltime=03:30:00 
+#PBS -lnodes=1:ppn=16
+
+##
+## setup env: 
+##
+
+source $HOME/myprofile.wt 
+
+echo "PRE: PWD="$PWD
+
+### My Python 
+
+PYTHONPATH=$HOME/code/WormTracker/python/:$PYTHONPATH
+export PYTHONPATH 
+
+video=$HOME/worms/videos/${videoName}.avi
+config=$HOME/worms/${videoName}.yml
+
+echo "PRE: TMPDIR=${TMPDIR}" 
+
+mkdir "$TMPDIR"/work
+cd "$TMPDIR"/work 
+
+mkdir -p out
+cp -rvf ${video} . 
+cp -rvf ${config} . 
+
+WORKDIR=${PWD} 
+echo "PRE: WORKDIR="${WORKDIR}
+echo "PRE: Contents of workdir before processing:" 
+
+ls -l 
+
+#config="$1"
+
+if [ -z "$config" ] ; then 
+  echo "***Error: no argument given. Specify config.yml file "
+  exit 1
+fi 
+
+python $HOME/code/WormTracker/python/runbatchanalysis.py -i "$config"
+python $HOME/code/WormTracker/python/runbatchpostprocess.py -i "$config"
+
+echo "POST: Contents of output dir:" 
+ls -l out/
+
+mkdir -p ~/worms/out/
+cp -vrf ${videoName}.h5 ~/worms/out/
