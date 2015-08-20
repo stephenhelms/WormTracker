@@ -48,14 +48,17 @@ def meanSquaredDisplacement(X, lags=500, exclude=None):
 
     Sigma = ma.zeros((len(lags),))
     for i, lag in enumerate(lags):
-        x0 = X[lag:, :].copy()
-        x1 = X[:-lag, :].copy()
-        reject = (exclude[lag:]-exclude[:-lag])>0
-        x0[reject, :] = ma.masked
-        x1[reject, :] = ma.masked
-        displacements = x0 - x1
-        d2 = (displacements**2).sum(axis=1).compressed()
-        Sigma[i] = d2.mean()
+        if i==0:
+            Sigma[i] = 0
+        else:
+            x0 = X[lag:, :].copy()
+            x1 = X[:-lag, :].copy()
+            reject = (exclude[lag:]-exclude[:-lag])>0
+            x0[reject, :] = ma.masked
+            x1[reject, :] = ma.masked
+            displacements = x0 - x1
+            d2 = (displacements**2).sum(axis=1).compressed()
+            Sigma[i] = d2.mean()
     return Sigma
 
 
