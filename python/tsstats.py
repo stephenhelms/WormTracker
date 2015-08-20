@@ -18,16 +18,19 @@ def acf(x, lags=500, exclude=None):
         lags = range(lags)
 
     C = ma.zeros((len(lags),))
+    sigma2 = x.var()
     for i, l in enumerate(lags):
         if l == 0:
             C[i] = 1
+        elif l >= x.shape[0]:
+            C[i] = ma.masked
         else:
             x0 = x[:-l].copy()
             x1 = x[l:].copy()
             reject = (exclude[l:]-exclude[:-l])>0
             x0[reject] = ma.masked
             x1[reject] = ma.masked
-            C[i] = ma.corrcoef(x0, x1)[0, 1]
+            C[i] = (x0*x1).mean()/sigma2
     return C
 
 
@@ -129,6 +132,8 @@ def drift(x, lags=500, exclude=None):
     for i, lag in enumerate(lags):
         if lag==0:
             mu[i] = 0
+        elif lag >= x.shape[0]:
+            mu[i] = ma.masked
         else:
             x0 = x[lag:].copy()
             x1 = x[:-lag].copy()
