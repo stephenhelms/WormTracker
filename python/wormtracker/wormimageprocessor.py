@@ -45,7 +45,7 @@ class WormImageProcessor:
     Performs image processing tasks needed to find a worm in an image.
     """
     def __init__(self, pixelSize=0.05, threshold=0.9, backgroundDiskRadius=5,
-                 wormDiskRadius=2, useBlur=False):
+                 wormDiskRadius=2, useBlur=True):
         self.pixelSize = pixelSize
         self.threshold = threshold
         self.backgroundDiskRadius = backgroundDiskRadius
